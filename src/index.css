@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: "Poppins";
+    src: url(/fonts/Poppins-Light.ttf) format("truetype");
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Poppins";
+    src: url(/fonts/Poppins-Medium.ttf) format("truetype");
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Poppins";
+    src: url(/fonts/Poppins-Bold.ttf) format("truetype");
+    font-weight: 800;
+    font-style: normal;
+}
+
+:root {
+    --clr-text: rgb(171, 171, 171);
+    --clr-body: rgb(53, 50, 62);
+    --clr-primary: rgb(42, 207, 207);
+    --clr-secondary: rgb(59, 48, 84);
+    --clr-accent: rgb(239, 240, 245);
+    --clr-white: hsl(0, 0%, 100%);
+
+    --fs--200: clamp(0.69rem, calc(0.66rem + 0.14vw), 0.78rem);
+    --fs--100: clamp(0.78rem, calc(0.72rem + 0.24vw), 0.94rem);
+    --fs-base: clamp(0.88rem, calc(0.79rem + 0.38vw), 1.13rem);
+    --fs-100: clamp(0.98rem, calc(0.86rem + 0.55vw), 1.35rem);
+    --fs-200: clamp(1.11rem, calc(0.93rem + 0.77vw), 1.62rem);
+    --fs-300: clamp(1.25rem, calc(1rem + 1.05vw), 1.94rem);
+    --fs-400: clamp(1.4rem, calc(1.07rem + 1.4vw), 2.33rem);
+    --fs-500: clamp(1.58rem, calc(1.15rem + 1.84vw), 2.8rem);
+    --fs-600: clamp(1.77rem, calc(1.22rem + 2.38vw), 3.36rem);
+    --fs-700: clamp(2rem, calc(1.28rem + 3.06vw), 4.03rem);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+* {
+    margin: 0;
+}
+
+html {
+    color-sheme: light;
+    scroll-behavior: smooth;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background-color: var(--clr-white);
+    font-size: var(--fs-base);
+    font-family: "Poppins", sans-serif;
+    font-weight: normal;
+    color: var(--clr-body);
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+a:focus,
+a:hover {
+    transition: color 500ms ease-in-out;
+}
+
+
+a:focus-visible,
+button:focus-visible {
+    --outline-size: max(2px, 0.15em);
+    outline: var(--outline-width, var(--outline-size)) var(--outline-style, dashed) var(--outline-color, currentColor);
+    outline-offset: var(--outline-offset, var(--outline-size));
+}
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+h1,
+h2,
+h3 {
+    line-height: 1.1;
+    font-weight: bold;
+}
+
+h1 {
+    font-size: var(--fs-700);
+}
+
+h2 {
+    font-size: var(--fs-400);
+}
+
+h3 {
+    font-size: var(--fs-200);
+}
+
+.wrapper {
+    width: min(100vw - 3rem, var(--container-max, 90ch));
+    margin-inline: auto;
+}
+
+.flow>*+* {
+    margin-top: var(--margin-height, 1rem);
+}
+
+.button {
+    padding: var(--button-padding, 0.35rem 1rem);
+    text-decoration: none;
+    border: 3px solid var(--clr-body);
+    background-color: var(--button-bg, var(--clr-white));
+    color: var(--button-color, var(--clr-body));
+    cursor: pointer;
+    transition: background-color 500ms ease-in-out;
+    border-radius: var(--button-radius, 0.5rem);
+    text-transform: capitalize;
+    font-weight: 600;
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.18)
+}
+
+.button:focus-visible {
+    --outline-color: var(--clr-body);
+    --outline-offset: -0.5rem;
+}
+
+.button:hover,
+.button:focus {
+    background-color: var(--clr-primary);
+    color: var(--clr-white);
+    transition: color, background-color 500ms ease;
+}
+
+.button svg {
+    width: var(--size, auto);
+    height: var(--size, auto);
+}
+
+.button svg,
+.button svg {
+    fill: currentColor;
+}
+
+.button--transparent {
+    --button-bg: transparent;
+    --button-color: var(--clr-text);
+    box-shadow: none;
+}
+
+.button--icon,
+.button--icon__big {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--size-gap, 1rem);
+}
+
+.button--icon {
+    --size-gap: 0.7rem;
+}
+
+.button--icon__big {
+    flex-direction: column;
+}
+
+.button--icon svg {
+    --size: 2rem;
+}
+
+.button--icon__big svg {
+    --size: 4rem;
+}
+
+.button--icon__small svg {
+    --size: 1.2rem
+}
+
+.grid {
+    --layout-grid-min: 30ch;
+    --layout-grid-gap: 3vw;
+    display: grid;
+    place-content: center;
+    grid-template-columns: repeat(auto-fit, minmax(min(100vw - 2rem, var(--layout-grid-min)), var(--layout-grid-max, 1fr)));
+    gap: var(--layout-grid-gap);
+}

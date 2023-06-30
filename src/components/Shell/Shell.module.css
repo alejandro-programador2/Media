@@ -1,0 +1,7 @@
+
+
+.section {
+    height: 100vh;
+    display: grid;
+    gap: var(--section-gap, 1rem);
+}

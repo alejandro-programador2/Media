@@ -1,0 +1,16 @@
+.content {
+    display: grid;
+    place-items: center;
+}
+
+.content label {
+    --button-padding: 1rem 0.8rem;
+
+    width: min(100vw - 2rem, 25ch);
+    text-transform: none;
+    font-weight: normal;
+}
+
+.content input {
+    opacity: 0;
+}
