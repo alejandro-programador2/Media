@@ -27,12 +27,17 @@ const cutAudio = async ({ file, startTime, endTime }) => {
     // Read the result
     const data = ffmpeg.FS("readFile", fileOutputName);
 
-    // Create a URL
-    const audioUrl = URL.createObjectURL(
-        new Blob([data.buffer], { type: "audio/mpeg" })
-    );
+    // create the file
+    const audioFile = new File([data.buffer], fileOutputName, { type: "audio/mpeg" })
 
-    return { url: audioUrl, name: fileOutputName }
+    // Create a URL
+    const audioUrl = URL.createObjectURL(audioFile);
+
+    return {
+        url: audioUrl,
+        name: fileOutputName,
+        file: audioFile
+    }
 }
 
 export default cutAudio

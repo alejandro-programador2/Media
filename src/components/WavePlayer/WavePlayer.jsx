@@ -1,5 +1,12 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/display-name */
-import { useRef, useImperativeHandle, forwardRef, useEffect } from "react";
+import {
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useEffect,
+  useCallback,
+} from "react";
 import PropTypes from "prop-types";
 
 import { useWaveSurfer } from "../../hooks/useWaveSurfer";
@@ -7,29 +14,33 @@ import converterTime from "../../helper/converterTime";
 
 import css from "./WavePlayer.module.css";
 
-export const WavePlayer = forwardRef(({ url, onRegionTime }, ref) => {
+export const WavePlayer = forwardRef(({ id, url, onRegionTime }, ref) => {
   const playerRef = useRef();
   const { wavesurfer, time, regionTime } = useWaveSurfer(playerRef, url);
 
-  const TogglePlay = () => {
+  const TogglePlay = useCallback(() => {
     wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
-  };
+  }, [wavesurfer]);
 
-  useImperativeHandle(ref, () => {
-    return {
-      TogglePlay,
-    };
-  });
+  useImperativeHandle(
+    ref,
+    () => {
+      return {
+        id,
+        TogglePlay,
+      };
+    },
+    []
+  );
 
   useEffect(() => {
-
     if (onRegionTime) {
       onRegionTime(regionTime);
     }
-  }, [onRegionTime, regionTime]);
+  }, [regionTime]);
 
   return (
-    <div>
+    <button id={id} className="border-2 w-full">
       <small className="block text-left">
         {converterTime(time.currentTime)} - {converterTime(time.duration)}
       </small>
@@ -37,11 +48,12 @@ export const WavePlayer = forwardRef(({ url, onRegionTime }, ref) => {
         ref={playerRef}
         className={`${css.waveplayer} border-4 border-[color:var(--clr-body)] rounded-md px-2`}
       />
-    </div>
+    </button>
   );
 });
 
 WavePlayer.propTypes = {
+  id: PropTypes.string,
   url: PropTypes.string,
   onRegionTime: PropTypes.func,
 };

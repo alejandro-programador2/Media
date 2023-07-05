@@ -55,6 +55,7 @@ export const useWaveSurfer = (element, url) => {
             });
 
             setTime(prev => ({ ...prev, duration }))
+            setRegionTime(prev => ({ ...prev, endRegion: duration }))
         });
 
         wavesurfer.on("timeupdate", (currentTime) => {
