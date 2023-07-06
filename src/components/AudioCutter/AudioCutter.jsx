@@ -58,6 +58,7 @@ export function AudioCutter() {
           <WavePlayer
             ref={waveplayerRef}
             url={file?.url}
+            name={file.name}
             onRegionTime={setRegionTime}
           />
           <div className="flex justify-between">

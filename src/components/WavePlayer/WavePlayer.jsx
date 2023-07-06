@@ -13,7 +13,7 @@ import converterTime from "../../helper/converterTime";
 
 import css from "./WavePlayer.module.css";
 
-export const WavePlayer = forwardRef(({ id, url, onRegionTime, ...props }, ref) => {
+export const WavePlayer = forwardRef(({ id, url, name, onRegionTime, ...props }, ref) => {
   const playerRef = useRef();
   const { wavesurfer, time, regionTime } = useWaveSurfer(playerRef, url);
 
@@ -22,8 +22,11 @@ export const WavePlayer = forwardRef(({ id, url, onRegionTime, ...props }, ref) 
   }
 
   useImperativeHandle(ref, () => {
+    if (wavesurfer === null) return;
+
     return {
       id,
+      isPlaying: wavesurfer.isPlaying.bind(wavesurfer),
       TogglePlay,
     };
   }, [wavesurfer]);
@@ -37,7 +40,7 @@ export const WavePlayer = forwardRef(({ id, url, onRegionTime, ...props }, ref) 
   return (
     <button id={id} className="w-full" {...props} >
       <small className="block text-left">
-        {converterTime(time.currentTime)} - {converterTime(time.duration)}
+        {converterTime(time.currentTime)} - {converterTime(time.duration)} | {name}
       </small>
       <div
         ref={playerRef}
@@ -50,5 +53,6 @@ export const WavePlayer = forwardRef(({ id, url, onRegionTime, ...props }, ref) 
 WavePlayer.propTypes = {
   id: PropTypes.string,
   url: PropTypes.string,
+  name: PropTypes.string,
   onRegionTime: PropTypes.func,
 };

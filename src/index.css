@@ -115,7 +115,7 @@ h3 {
 }
 
 .wrapper {
-    width: min(100vw - 3rem, var(--container-max, 90ch));
+    width: min(100vw - 3rem, var(--container-max, 85ch));
     margin-inline: auto;
 }
 

@@ -8,6 +8,7 @@ export function FileAudio({ multiple, onFile, label }) {
   const handleChange = ({ target }) => {
     const files = Array.from(target.files, (file) => ({
       id: crypto.randomUUID(),
+      name: file.name.replace(/\.mp3$/, ''),
       url: URL.createObjectURL(file),
       file,
     }));
