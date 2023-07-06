@@ -25,7 +25,7 @@ const joinAudio = async ({ files }) => {
         ffmpeg.FS("writeFile", `input${i}.mp3`, await fetchFile(audioFiles[i]));
     }
 
-    // Make the "filter complex" configuration
+    // Configure the "filter complex"
     for (let i = 0; i < audioFiles.length; i++) {
         filterComplex += `[${i}:a]`;
     }
@@ -35,8 +35,8 @@ const joinAudio = async ({ files }) => {
     const inputArgs = audioFiles.map((_, i) => `input${i}.mp3`);
 
     /**
-     * Link together the audio files.
-     * We need to create the next query:
+     * Link the audio files together.
+     * We need to create the following query:
      * @example: 
      *  ffmpeg -i input0.mp3 -i input1.mp3 -i input2.mp3 -filter_complex "[0:a][1:a][2:a]concat=n=3:v=0:a=1[a]" -map "[a]" output.mp3
      */

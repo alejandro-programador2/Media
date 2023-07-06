@@ -4,8 +4,7 @@ import {
   useRef,
   useImperativeHandle,
   forwardRef,
-  useEffect,
-  useCallback,
+  useEffect
 } from "react";
 import PropTypes from "prop-types";
 
@@ -14,24 +13,20 @@ import converterTime from "../../helper/converterTime";
 
 import css from "./WavePlayer.module.css";
 
-export const WavePlayer = forwardRef(({ id, url, onRegionTime }, ref) => {
+export const WavePlayer = forwardRef(({ id, url, onRegionTime, ...props }, ref) => {
   const playerRef = useRef();
   const { wavesurfer, time, regionTime } = useWaveSurfer(playerRef, url);
 
-  const TogglePlay = useCallback(() => {
+  const TogglePlay = () => {
     wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
-  }, [wavesurfer]);
+  }
 
-  useImperativeHandle(
-    ref,
-    () => {
-      return {
-        id,
-        TogglePlay,
-      };
-    },
-    []
-  );
+  useImperativeHandle(ref, () => {
+    return {
+      id,
+      TogglePlay,
+    };
+  }, [wavesurfer]);
 
   useEffect(() => {
     if (onRegionTime) {
@@ -40,7 +35,7 @@ export const WavePlayer = forwardRef(({ id, url, onRegionTime }, ref) => {
   }, [regionTime]);
 
   return (
-    <button id={id} className="border-2 w-full">
+    <button id={id} className="w-full" {...props} >
       <small className="block text-left">
         {converterTime(time.currentTime)} - {converterTime(time.duration)}
       </small>
