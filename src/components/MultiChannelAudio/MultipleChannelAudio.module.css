@@ -1,0 +1,3 @@
+.draggable>button {
+    transform: translate3d(var(--translate-x, 0), var(--translate-y, 0), 0);
+}

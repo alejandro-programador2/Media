@@ -1,6 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
-import { ErrorPage, Join, Home, Cut } from "./pages";
+import { ErrorPage, Join, Home, Cut, MultiChannel } from "./pages";
 import Layout from "./layout/Layout";
 
 function App() {
@@ -22,6 +22,10 @@ function App() {
         {
           path: "join-audio",
           element: <Join />,
+        },
+        {
+          path: "multi-channel",
+          element: <MultiChannel />,
         },
       ],
     },

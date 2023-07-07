@@ -17,6 +17,9 @@ export function Header() {
             <li>
               <Link to="join-audio">Join Audio</Link>
             </li>
+            <li>
+              <Link to="multi-channel">Multi-channel</Link>
+            </li>
           </ul>
         </nav>
       </div>

@@ -13,7 +13,7 @@ import converterTime from "../../helper/converterTime";
 
 import css from "./WavePlayer.module.css";
 
-export const WavePlayer = forwardRef(({ id, url, name, onRegionTime, ...props }, ref) => {
+export const WavePlayer = forwardRef(({ id, url, name, onRegionTime, onlyName,  ...props }, ref) => {
   const playerRef = useRef();
   const { wavesurfer, time, regionTime } = useWaveSurfer(playerRef, url);
 
@@ -40,7 +40,7 @@ export const WavePlayer = forwardRef(({ id, url, name, onRegionTime, ...props },
   return (
     <button id={id} className="w-full" {...props} >
       <small className="block text-left">
-        {converterTime(time.currentTime)} - {converterTime(time.duration)} | {name}
+        {!onlyName &&  `${converterTime(time.currentTime)} - ${converterTime(time.duration)} | `}<b>{name}</b>
       </small>
       <div
         ref={playerRef}
@@ -55,4 +55,5 @@ WavePlayer.propTypes = {
   url: PropTypes.string,
   name: PropTypes.string,
   onRegionTime: PropTypes.func,
+  onlyName: PropTypes.bool
 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import WaveSurfer from "https://unpkg.com/wavesurfer.js@beta";
 import Regions from "https://unpkg.com/wavesurfer.js@7.0.0-beta.11/dist/plugins/regions.js";
+import Hover from 'https://unpkg.com/wavesurfer.js@beta/dist/plugins/hover.js'
 
 export const useWaveSurfer = (element, url) => {
     const [wavesurfer, setWaveSurfer] = useState(null)
@@ -25,11 +26,22 @@ export const useWaveSurfer = (element, url) => {
             url,
             waveColor: "rgb(53, 50, 62)",
             progressColor: "rgb(171, 171, 171)",
-            plugins: [Regions.create()],
+            plugins: [
+                Regions.create(),
+                Hover.create({
+                    lineColor: 'rgb(53, 50, 62)',
+                    lineWidth: 4,
+                    labelBackground: 'rgb(53, 50, 62)',
+                    labelColor: '#fff',
+                    labelSize: '11px',
+                }),
+            ],
             barWidth: "3",
             barGap: "2",
             barRadius: "2",
-            normalize: true
+            // fillParent: true,
+            normalize: true,
+            // minPxPerSec: 1
         });
 
         setWaveSurfer(wave);

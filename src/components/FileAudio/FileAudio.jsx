@@ -2,13 +2,13 @@ import { useId } from "react";
 import PropTypes from "prop-types";
 import css from "./FileAudio.module.css";
 
-export function FileAudio({ multiple, onFile, label }) {
+export function FileAudio({ multiple, onFile, label, isLabelVisible }) {
   const inputId = useId();
 
   const handleChange = ({ target }) => {
     const files = Array.from(target.files, (file) => ({
       id: crypto.randomUUID(),
-      name: file.name.replace(/\.mp3$/, ''),
+      name: file.name.replace(/\.mp3$/, ""),
       url: URL.createObjectURL(file),
       file,
     }));
@@ -21,7 +21,8 @@ export function FileAudio({ multiple, onFile, label }) {
   return (
     <div className={css["content"]}>
       <label htmlFor={inputId} className="button button--icon my-1 md:my-4">
-        {label}
+        <span className={`${!isLabelVisible && "sr-only"}`}> {label} </span>
+
         <svg
           xmlns="http://www.w3.org/2000/svg"
           height="48"
@@ -45,10 +46,12 @@ export function FileAudio({ multiple, onFile, label }) {
 
 FileAudio.defaultProps = {
   label: "Put your audio file here",
+  isLabelVisible: true
 };
 
 FileAudio.propTypes = {
   multiple: PropTypes.bool,
   onFile: PropTypes.func,
   label: PropTypes.string,
+  isLabelVisible: PropTypes.bool,
 };

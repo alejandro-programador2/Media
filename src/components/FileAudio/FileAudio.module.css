@@ -6,7 +6,7 @@
 .content label {
     --button-padding: 1rem 0.8rem;
 
-    width: min(100vw - 2rem, 25ch);
+    width: max-content;
     text-transform: none;
     font-weight: normal;
 }
