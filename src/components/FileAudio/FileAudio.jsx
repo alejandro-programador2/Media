@@ -2,7 +2,7 @@ import { useId } from "react";
 import PropTypes from "prop-types";
 import css from "./FileAudio.module.css";
 
-export function FileAudio({ multiple, onFile, label, isLabelVisible }) {
+export function FileAudio({ multiple, onFile, label, rounded, className }) {
   const inputId = useId();
 
   const handleChange = ({ target }) => {
@@ -20,8 +20,13 @@ export function FileAudio({ multiple, onFile, label, isLabelVisible }) {
 
   return (
     <div className={css["content"]}>
-      <label htmlFor={inputId} className="button button--icon my-1 md:my-4">
-        <span className={`${!isLabelVisible && "sr-only"}`}> {label} </span>
+      <label
+        htmlFor={inputId}
+        className={`button ${
+          rounded && "button--rounded"
+        } button--icon my-1 md:my-3 ${className ?? ""}`}
+      >
+        <span className={`${rounded && "sr-only"}`}> {label} </span>
 
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -38,6 +43,7 @@ export function FileAudio({ multiple, onFile, label, isLabelVisible }) {
         accept="audio/*"
         required
         onChange={handleChange}
+        className="sr-only"
         {...(multiple && { multiple })}
       />
     </div>
@@ -46,12 +52,12 @@ export function FileAudio({ multiple, onFile, label, isLabelVisible }) {
 
 FileAudio.defaultProps = {
   label: "Put your audio file here",
-  isLabelVisible: true
 };
 
 FileAudio.propTypes = {
   multiple: PropTypes.bool,
   onFile: PropTypes.func,
   label: PropTypes.string,
-  isLabelVisible: PropTypes.bool,
+  rounded: PropTypes.bool,
+  className: PropTypes.string,
 };

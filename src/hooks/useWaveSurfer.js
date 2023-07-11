@@ -3,7 +3,7 @@ import WaveSurfer from "https://unpkg.com/wavesurfer.js@beta";
 import Regions from "https://unpkg.com/wavesurfer.js@7.0.0-beta.11/dist/plugins/regions.js";
 import Hover from 'https://unpkg.com/wavesurfer.js@beta/dist/plugins/hover.js'
 
-export const useWaveSurfer = (element, url) => {
+export const useWaveSurfer = (element, props) => {
     const [wavesurfer, setWaveSurfer] = useState(null)
 
     const [time, setTime] = useState({
@@ -23,7 +23,6 @@ export const useWaveSurfer = (element, url) => {
 
         const wave = WaveSurfer.create({
             container: element.current,
-            url,
             waveColor: "rgb(53, 50, 62)",
             progressColor: "rgb(171, 171, 171)",
             plugins: [
@@ -39,9 +38,9 @@ export const useWaveSurfer = (element, url) => {
             barWidth: "3",
             barGap: "2",
             barRadius: "2",
-            // fillParent: true,
             normalize: true,
-            // minPxPerSec: 1
+            responsive: true,
+            ...props,
         });
 
         setWaveSurfer(wave);
@@ -49,7 +48,7 @@ export const useWaveSurfer = (element, url) => {
         return () => {
             wave.destroy();
         };
-    }, [url, element]);
+    }, [element]);
 
     useEffect(() => {
         if (!wavesurfer) return;
