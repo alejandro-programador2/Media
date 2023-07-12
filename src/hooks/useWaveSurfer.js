@@ -40,6 +40,7 @@ export const useWaveSurfer = (element, props) => {
             barRadius: "2",
             normalize: true,
             responsive: true,
+            hideScrollbar: true,
             ...props,
         });
 

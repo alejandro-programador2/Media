@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
   DndContext,
@@ -24,18 +24,17 @@ import css from "./MultipleChannelAudio.module.css";
 export function MultiChannelAudio() {
   const [files, setFiles] = useState([]);
   const [mainAudioFile, setMainAudioFile] = useState();
+  const [mainAudioDuration, setMainAudioDuration] = useState(0);
 
   const saveAudioFileToState = (file) => {
     setFiles((prev) => [...prev, ...file]);
   };
 
-  const mainAudioDuration = useRef(0);
-
   useEffect(() => {
-    if (files.length === 0) return;
+    if (!mainAudioDuration) return;
 
     const timeLineElement = document.querySelector(
-      'div[data-component="time-line"]'
+      'div[data-component="timeline"]'
     );
 
     if (timeLineElement) {
@@ -45,7 +44,7 @@ export function MultiChannelAudio() {
       const newWidth = `calc(100% - 85ch + ${timeLineElement.clientWidth}px)`;
       draggabeListElement.style.width = newWidth;
     }
-  }, [files]);
+  }, [mainAudioDuration]);
 
   return (
     <div className="flow">
@@ -55,7 +54,7 @@ export function MultiChannelAudio() {
         min={1}
         max={6}
         value={slider}
-        onChange={handleChange}
+        onChange={(e) => setSlider(parseInt(e.target.value))}
       />
       <strong className="mx-5">{slider}</strong> */}
 
@@ -72,7 +71,7 @@ export function MultiChannelAudio() {
             />
             <div className="relative border-[color:var(--clr-body)] border-4 rounded-md flex flex-col flex-1 py-6 my-2 w-full overflow-x-auto">
               <div className="h-[36px] z-[30] absolute top-0 bg-neutral-100 rounded flex-shrink-0">
-                <TimeLine duration={mainAudioDuration.current} />
+                <TimeLine duration={mainAudioDuration} />
               </div>
 
               <ul
@@ -81,7 +80,12 @@ export function MultiChannelAudio() {
               >
                 {files.map(({ id, url, name }) => (
                   <WaveDraggable key={id} id={id}>
-                    <WavePlayerItem id={id} url={url} name={name} duration={mainAudioDuration.current} />
+                    <WavePlayerItem
+                      id={id}
+                      url={url}
+                      name={name}
+                      duration={mainAudioDuration}
+                    />
                   </WaveDraggable>
                 ))}
               </ul>
@@ -91,7 +95,7 @@ export function MultiChannelAudio() {
           <WavePlayer
             url={mainAudioFile?.url}
             name={mainAudioFile.name}
-            onDuration={(duration) => (mainAudioDuration.current = duration)}
+            onDuration={(duration) => setMainAudioDuration(duration)}
             onlyName
           />
           <div className="flex justify-between">
@@ -109,44 +113,26 @@ export function MultiChannelAudio() {
   );
 }
 
-function WavePlayerItem(props) {
-  const { duration: totalDuration, url } = props
+function WavePlayerItem({ duration: totalDuration, ...props }) {
+  const minPxPerSec = useCallback(() => {
+    const TIMELINE_PADDING = 0.9; // It's equal to 90%
 
-  const [pxPerSecState , setPxPerSecState] = useState(0)
+    const timelineElement = document.querySelector(
+      'div[data-component="timeline"]'
+    );
+    const widthOfTimeline = timelineElement?.clientWidth;
 
-  const widthTimeline = document.querySelector(
-    'div[data-component="time-line"]'
-  ).clientWidth
+    return (widthOfTimeline * TIMELINE_PADDING) / totalDuration;
+  }, [totalDuration]);
 
-  useEffect(() => {
-    if (!totalDuration) return;
-  
-    // Cargar el archivo de audio
-    const audio = new Audio(url);
-  
-    // Crear un objeto de audio context
-    const audioContext = new AudioContext();
-  
-    // Obtener la duración del archivo de audio
-    audio.addEventListener('loadedmetadata', () => {
-      const duration = audio.duration;
-      const pxPerSec = widthTimeline / totalDuration;
-      setPxPerSecState(((duration / totalDuration) * pxPerSec) + 8);
-    });
-  
-    return () => {
-      // Limpiar los recursos cuando se desmonte el componente
-      audioContext.close();
-    };
-  }, [totalDuration, url, widthTimeline]);
-  
-
-  return pxPerSecState ?  <WavePlayer {...props} onlyName minPxPerSec={pxPerSecState + 8} /> : null
+  return <WavePlayer {...props} minPxPerSec={minPxPerSec()} onlyName />;
 }
 
 function TimeLine({ duration, slider = 1 }) {
+  const TIMELINE_PADDING = 1.1;
+
   const timeLineNumbers = Array.from(
-    { length: Math.floor(duration / slider) },
+    { length: Math.floor((duration * TIMELINE_PADDING) / slider) },
     (_, i) => i * slider
   );
 
@@ -158,7 +144,7 @@ function TimeLine({ duration, slider = 1 }) {
         {visibleNumber && (
           <>
             <small className="text-[11px] absolute bottom-[16px] text-gray-300 font-bold">
-              {converterTime(timeLineNumbers[i])}
+              {i === 0 ? 0 : converterTime(timeLineNumbers[i])}
             </small>
             <div className="bg-gray-300 flex-shrink-0 absolute bottom-0 w-[2px] h-[14px]"></div>
           </>
@@ -170,8 +156,8 @@ function TimeLine({ duration, slider = 1 }) {
 
   return (
     <div
-      data-component="time-line"
-      className="px-6 w-full h-full items-end flex"
+      data-component="timeline"
+      className="px-[4.8px] w-full h-full items-end flex"
       style={{ gap: "16px" }}
     >
       {lines}
@@ -219,7 +205,7 @@ function WaveDraggableItem({ id, children, style }) {
     <div
       ref={setNodeRef}
       style={elementStyle}
-      className={`relative flex items-center justify-center ${css["draggable"]} w-fit border-2 border-green-300`}
+      className={`relative flex items-center justify-center ${css["draggable"]} w-fit`}
       {...listeners}
     >
       {children}

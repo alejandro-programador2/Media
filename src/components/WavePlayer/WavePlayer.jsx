@@ -89,7 +89,7 @@ export const WavePlayer = forwardRef(
     // }, [wavesurfer])
 
     return (
-      <button id={id} className="w-full" {...props}>
+      <button id={id} data-duration={Math.round(time.duration)} className="w-full" {...props}>
         <small className="block text-left">
           {!onlyName &&
             `${converterTime(time.currentTime)} - ${converterTime(
@@ -99,7 +99,7 @@ export const WavePlayer = forwardRef(
         </small>
         <div
           ref={playerRef}
-          className={`${css.waveplayer} border-4 border-[color:var(--clr-body)] rounded-md px-2`}
+          className={`${css.waveplayer} border-4 border-[color:var(--clr-body)] rounded-md`}
         />
       </button>
     );
