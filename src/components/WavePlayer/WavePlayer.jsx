@@ -1,7 +1,14 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable react/display-name */
-import { useRef, useImperativeHandle, forwardRef, useEffect } from "react";
+import {
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import PropTypes from "prop-types";
+import Regions from "https://unpkg.com/wavesurfer.js@7.0.0-beta.11/dist/plugins/regions.js";
+import Hover from "https://unpkg.com/wavesurfer.js@beta/dist/plugins/hover.js";
 
 import { useWaveSurfer } from "../../hooks/useWaveSurfer";
 import converterTime from "../../helper/converterTime";
@@ -14,40 +21,90 @@ export const WavePlayer = forwardRef(
       id,
       url,
       name,
-      onRegionTime,
-      onDuration,
-      onlyName,
-      fillParent,
+      interact = true,
+      hasPlugins = true,
+      hiddenTime,
       minPxPerSec,
-      hideScrollbar,
+      onRegionTime,
       ...props
     },
     ref
   ) => {
+    const [regionTime, setRegionTime] = useState({
+      startRegion: 0,
+      endRegion: 0,
+    });
+
     const playerRef = useRef();
-    const { wavesurfer, time, regionTime } = useWaveSurfer(playerRef, {
+    const { wavesurfer, time } = useWaveSurfer(playerRef, {
       url,
-      fillParent,
       minPxPerSec,
-      hideScrollbar,
+      interact,
+      ...(hasPlugins && {
+        plugins: [
+          Regions.create(),
+          Hover.create({
+            lineColor: "rgb(53, 50, 62)",
+            lineWidth: 3,
+            labelBackground: "rgb(53, 50, 62)",
+            labelColor: "#fff",
+            labelSize: "11px",
+          }),
+        ],
+      }),
     });
 
     const TogglePlay = () => {
       wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
     };
 
+    const WaveSurferRegion = useCallback(
+      () => hasPlugins && wavesurfer.plugins[0],
+      [wavesurfer, hasPlugins]
+    );
+
+    useEffect(() => {
+      if (!wavesurfer || !hasPlugins) return;
+
+      // Events
+      wavesurfer.on("ready", () => {
+        const duration = wavesurfer.getDuration();
+
+        WaveSurferRegion().addRegion({
+          start: 0,
+          end: duration,
+          color: "rgb(42 207 207 / 22%)",
+        });
+
+        setRegionTime((prev) => ({ ...prev, endRegion: duration }));
+      });
+
+      WaveSurferRegion().on("region-updated", (region) => {
+        setRegionTime({
+          startRegion: region.start,
+          endRegion: region.end,
+        });
+      });
+
+      return () => {
+        wavesurfer.unAll();
+      };
+    }, [wavesurfer, WaveSurferRegion, hasPlugins]);
+
     useImperativeHandle(
       ref,
       () => {
-        if (wavesurfer === null) return;
-
-        return {
-          id,
-          isPlaying: wavesurfer.isPlaying.bind(wavesurfer),
-          TogglePlay,
-        };
+        if (wavesurfer) {
+          return {
+            id,
+            isPlaying: wavesurfer.isPlaying.bind(wavesurfer),
+            duration: time.duration,
+            currentTime: time.currentTime,
+            TogglePlay,
+          };
+        }
       },
-      [wavesurfer]
+      [wavesurfer, time]
     );
 
     useEffect(() => {
@@ -55,13 +112,6 @@ export const WavePlayer = forwardRef(
         onRegionTime(regionTime);
       }
     }, [regionTime]);
-
-
-    useEffect(() => {
-      if (time?.duration && onDuration) {
-        onDuration(time.duration)
-      }
-    }, [time])
 
     // useEffect(() => {
     //   if (!wavesurfer) return;
@@ -77,7 +127,7 @@ export const WavePlayer = forwardRef(
     //       '5': 5,
     //       '6': 1
     //     }
-      
+
     //     slider.addEventListener('input', (e) => {
     //       const minPxPerSec = e.target.valueAsNumber
 
@@ -85,13 +135,17 @@ export const WavePlayer = forwardRef(
     //       wavesurfer.zoom(ZOOM[minPxPerSec])
     //     })
 
-        //   })
+    //   })
     // }, [wavesurfer])
 
     return (
-      <button id={id} data-duration={Math.round(time.duration)} className="w-full" {...props}>
+      <button
+        id={id}
+        className="w-full"
+        {...props}
+      >
         <small className="block text-left">
-          {!onlyName &&
+          {!hiddenTime &&
             `${converterTime(time.currentTime)} - ${converterTime(
               time.duration
             )} | `}
@@ -106,18 +160,14 @@ export const WavePlayer = forwardRef(
   }
 );
 
-WavePlayer.defaultProps = {
-  fillParent: true
-}
-
 WavePlayer.propTypes = {
   id: PropTypes.string,
   url: PropTypes.string,
   name: PropTypes.string,
-  onRegionTime: PropTypes.func,
-  onDuration: PropTypes.func,
-  onlyName: PropTypes.bool,
-  fillParent: PropTypes.bool,
+  interact: PropTypes.bool,
+  noPlugins: PropTypes.bool,
+  hiddenTime: PropTypes.bool,
   minPxPerSec: PropTypes.number,
-  hideScrollbar: PropTypes.bool,
+  onRegionTime: PropTypes.func,
+  hasPlugins: PropTypes.bool,
 };
