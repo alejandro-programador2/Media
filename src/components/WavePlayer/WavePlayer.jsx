@@ -58,6 +58,10 @@ export const WavePlayer = forwardRef(
       wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
     };
 
+    const setWaveTime = (time) => {
+      wavesurfer.setTime(time)
+    }
+
     const WaveSurferRegion = useCallback(
       () => hasPlugins && wavesurfer.plugins[0],
       [wavesurfer, hasPlugins]
@@ -101,6 +105,7 @@ export const WavePlayer = forwardRef(
             duration: time.duration,
             currentTime: time.currentTime,
             TogglePlay,
+            setWaveTime
           };
         }
       },

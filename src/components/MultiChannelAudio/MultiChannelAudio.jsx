@@ -1,5 +1,12 @@
 /* eslint-disable react/display-name */
-import { useState, useEffect, useCallback, forwardRef, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  forwardRef,
+  useRef,
+  useMemo,
+} from "react";
 import PropTypes from "prop-types";
 import {
   DndContext,
@@ -27,22 +34,22 @@ const TIMELINE_PADDING = Object.freeze({
 });
 
 export function MultiChannelAudio() {
-  const [files, setFiles] = useState([]);
+  const [track, setTrack] = useState([]);
   const [mainAudioFile, setMainAudioFile] = useState();
   const [timelineWidth, setTimelineWidth] = useState();
-  const [playbackIconState, setPlaybackIconState] = useState(false);
-
   const [mainAudioTimeInfo, setMainAudioTimeInfo] = useState({
     duration: 0,
     currentTime: 0,
   });
-  const TogglePayAudio = useRef();
+  
+  const waveEvents = useRef()
 
   const mainWavePlayerRef = useCallback((options) => {
     if (options) {
-      const { duration, currentTime, TogglePlay } = options;
+      const { duration, currentTime, TogglePlay, setWaveTime } = options;
       setMainAudioTimeInfo({ duration, currentTime });
-      TogglePayAudio.current = { TogglePlay };
+
+      waveEvents.current = { TogglePlay, setWaveTime }; 
     }
   }, []);
 
@@ -53,12 +60,19 @@ export function MultiChannelAudio() {
   }, []);
 
   const saveAudioFileToState = (file) => {
-    setFiles((prev) => [...prev, ...file]);
+    setTrack((prev) => [...prev, ...file]);
   };
 
   const toggleAudioPlayback = () => {
-    TogglePayAudio.current.TogglePlay();
-    setPlaybackIconState(!playbackIconState);
+    waveEvents.current.TogglePlay();
+  };
+
+  const handleClickTimeline = ({ nativeEvent }) => {
+    const pixelsPerSecond =
+      (timelineWidth * TIMELINE_PADDING.DECREASE) / mainAudioTimeInfo.duration;
+    const timeInSeconds = nativeEvent.layerX / pixelsPerSecond;
+
+    waveEvents.current.setWaveTime(timeInSeconds);
   };
 
   useEffect(() => {
@@ -74,43 +88,35 @@ export function MultiChannelAudio() {
 
   return (
     <div className="flow">
-      {/* TODO: Make a zoom */}
-      {/* <input
-        type="range"
-        min={1}
-        max={6}
-        value={slider}
-        onChange={(e) => setSlider(parseInt(e.target.value))}
-      />
-      <strong className="mx-5">{slider}</strong> */}
-
       {mainAudioFile ? (
         <>
-          <strong>
-            {mainAudioTimeInfo.currentTime} - {mainAudioTimeInfo.duration} -{" "}
-            {timelineWidth}
-          </strong>
-
           <FileAudio
             multiple
             onFile={saveAudioFileToState}
             rounded
             className="justify-self-end md:my-1"
           />
-
           <div className="relative border-[color:var(--clr-body)] border-4 rounded-md flex flex-col flex-1 py-6 my-2 w-full overflow-x-auto">
-            <div className="h-[36px] z-[30] absolute top-0 bg-neutral-100 rounded flex-shrink-0">
+            <div
+              className="h-[36px] z-[30] absolute top-0 bg-neutral-100 rounded flex-shrink-0"
+              onClick={handleClickTimeline}
+            >
               <TimeLine
                 ref={timelineRef}
                 duration={mainAudioTimeInfo.duration}
               />
             </div>
 
+            <Tracker
+              width={timelineWidth}
+              duration={mainAudioTimeInfo.duration}
+              currentTime={mainAudioTimeInfo.currentTime}
+            />
             <ul
               data-component="wave-draggable-list"
               className="h-full overflow-hidden rounded relative"
             >
-              {files.map(({ id, url, name }) => (
+              {track.map(({ id, url, name }) => (
                 <WaveDraggable key={id} id={id}>
                   <WavePlayerItem
                     id={id}
@@ -121,46 +127,19 @@ export function MultiChannelAudio() {
                 </WaveDraggable>
               ))}
             </ul>
-
-            <div
-              className="bg-teal-500 absolute h-full w-[2px] z-[40] top-0 cursor-ew-resize"
-              style={{
-                left: `${
-                  mainAudioTimeInfo.currentTime *
-                  ((timelineWidth * TIMELINE_PADDING.DECREASE) /
-                    mainAudioTimeInfo.duration)
-                }px`,
-              }}
-            >
-              <div className="bg-teal-500 absolute w-[12px] h-[12px] rounded-sm top-0 left-[calc(50%+1px)] -translate-x-1/2"></div>
-              <div className="bg-teal-500 absolute w-[9px] h-[9px] rounded-sm rotate-45 top-[6px] left-[calc(50%+1px)] -translate-x-1/2"></div>
-            </div>
           </div>
 
           <WavePlayer
             ref={mainWavePlayerRef}
             url={mainAudioFile?.url}
-            name={mainAudioFile.name}
+            name={mainAudioFile?.name}
             interact={false}
             hasPlugins={false}
             hiddenTime
           />
-          <div className="flex justify-between">
-            <button
-              className="button button--icon__small self-start"
-              onClick={toggleAudioPlayback}
-            >
-              {playbackIconState ? (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
-                  <path d="M48 64C21.5 64 0 85.5 0 112V400c0 26.5 21.5 48 48 48H80c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H48zm192 0c-26.5 0-48 21.5-48 48V400c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H240z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
-                  <path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z" />
-                </svg>
-              )}
-            </button>
 
+          <div className="flex justify-between">
+            <ButtonPlay onClick={toggleAudioPlayback} />
             <button className="button">Export</button>
           </div>
         </>
@@ -172,7 +151,7 @@ export function MultiChannelAudio() {
 }
 
 function WavePlayerItem({ duration: totalDuration, ...props }) {
-  const minPxPerSec = useCallback(() => {
+  const minPixelPerSec = useMemo(() => {
     const timelineElement = document.querySelector(
       'div[data-component="timeline"]'
     );
@@ -184,7 +163,7 @@ function WavePlayerItem({ duration: totalDuration, ...props }) {
   return (
     <WavePlayer
       {...props}
-      minPxPerSec={minPxPerSec()}
+      minPxPerSec={minPixelPerSec}
       interact={false}
       hasPlugins={false}
       hiddenTime
@@ -202,7 +181,10 @@ const TimeLine = forwardRef(({ duration, slider = 1 }, ref) => {
     const visibleNumber = (Math.round(i * 100) / 100) % 5 === 0;
 
     return (
-      <div key={i} className="select-none flex flex-col items-center relative">
+      <div
+        key={i}
+        className="select-none pointer-events-none flex flex-col items-center relative"
+      >
         {visibleNumber && (
           <>
             <small className="text-[11px] absolute bottom-[16px] text-gray-300 font-bold">
@@ -283,6 +265,61 @@ function WaveDraggableItem({ id, children, style }) {
     </div>
   );
 }
+
+function Tracker({ currentTime, duration, width }) {
+  return (
+    <div
+      className="bg-teal-500 absolute h-full w-[2px] z-[40] top-0 cursor-ew-resize"
+      style={{
+        left: `${
+          currentTime * ((width * TIMELINE_PADDING.DECREASE) / duration)
+        }px`,
+      }}
+    >
+      <div className="bg-teal-500 absolute w-[12px] h-[12px] rounded-sm top-0 left-[calc(50%+1px)] -translate-x-1/2"></div>
+      <div className="bg-teal-500 absolute w-[9px] h-[9px] rounded-sm rotate-45 top-[6px] left-[calc(50%+1px)] -translate-x-1/2"></div>
+    </div>
+  );
+}
+
+function ButtonPlay({ onClick }) {
+  const [playbackIconState, setPlaybackIconState] = useState(false);
+
+  const toggleAudioPlayback = (event) => {
+    setPlaybackIconState(!playbackIconState);
+
+    if (onClick) {
+      onClick(event);
+    }
+  };
+
+  return (
+    <button
+      className="button button--icon__small self-start"
+      onClick={toggleAudioPlayback}
+    >
+      {playbackIconState ? (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+          <path d="M48 64C21.5 64 0 85.5 0 112V400c0 26.5 21.5 48 48 48H80c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H48zm192 0c-26.5 0-48 21.5-48 48V400c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H240z" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
+          <path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+Tracker.propTypes = {
+  currentTime: PropTypes.number,
+  duration: PropTypes.number,
+  width: PropTypes.number,
+};
+
+ButtonPlay.propTypes = {
+  onClick: PropTypes.func,
+};
 
 TimeLine.propTypes = {
   duration: PropTypes.number,
