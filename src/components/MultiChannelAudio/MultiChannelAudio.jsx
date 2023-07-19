@@ -27,6 +27,7 @@ import { FileAudio } from "../FileAudio";
 import converterTime from "../../helper/converterTime";
 
 import css from "./MultipleChannelAudio.module.css";
+import mixAudio from "../../helper/mixAudio";
 
 const TIMELINE_PADDING = Object.freeze({
   INCREASE: 1.1, // 10%
@@ -191,6 +192,43 @@ export function MultiChannelAudio() {
     draggabeListElement.style.width = newWidth;
   }, [timelineWidth]);
 
+  const createDownloadAudioLink = ({ url, name }) => {
+    const downloadAudio = document.createElement("a");
+    downloadAudio.href = url;
+    downloadAudio.style.display = "none";
+
+    downloadAudio.setAttribute("download", name);
+    downloadAudio.click();
+  };
+
+  const exportAudioFile = async () => {
+    try {
+      // Map tracks to get the desired format for files
+      const files = tracks.map((track) => ({
+        file: track.file,
+        startTime: track.timeStart,
+        endTime: track.timeStart + track.duration,
+      }));
+  
+      // Mix the audio with the main audio file and other tracks
+      const newAudio = await mixAudio({
+        files: [
+          {
+            file: mainAudioFile.file,
+            startTime: 0,
+            endTime: 0,
+          },
+          ...files,
+        ],
+      });
+  
+      // Create a link to download the new audio
+      createDownloadAudioLink(newAudio);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  
   return (
     <div className="flow">
       {mainAudioFile ? (
@@ -247,7 +285,7 @@ export function MultiChannelAudio() {
 
           <div className="flex justify-between">
             <ButtonPlay onClick={toggleAudioPlayback} />
-            <button className="button">Export</button>
+            <button className="button" onClick={exportAudioFile}>Export</button>
           </div>
         </>
       ) : (
