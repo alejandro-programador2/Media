@@ -34,22 +34,20 @@ const TIMELINE_PADDING = Object.freeze({
 });
 
 export function MultiChannelAudio() {
-  const [track, setTrack] = useState([]);
   const [mainAudioFile, setMainAudioFile] = useState();
   const [timelineWidth, setTimelineWidth] = useState();
-  const [mainAudioTimeInfo, setMainAudioTimeInfo] = useState({
-    duration: 0,
-    currentTime: 0,
-  });
-  
-  const waveEvents = useRef()
+  const [currentTime, setCurrentTime] = useState(0);
+  const [tracks, setTracks] = useState([]);
+
+  const waveEvents = useRef();
+  const waveItemRef = useRef([]);
+  const positionInSeconds = useRef();
 
   const mainWavePlayerRef = useCallback((options) => {
     if (options) {
-      const { duration, currentTime, TogglePlay, setWaveTime } = options;
-      setMainAudioTimeInfo({ duration, currentTime });
-
-      waveEvents.current = { TogglePlay, setWaveTime }; 
+      const { currentTime, TogglePlay, setWaveTime, isPlaying } = options;
+      waveEvents.current = { TogglePlay, setWaveTime, isPlaying };
+      setCurrentTime(currentTime);
     }
   }, []);
 
@@ -60,20 +58,127 @@ export function MultiChannelAudio() {
   }, []);
 
   const saveAudioFileToState = (file) => {
-    setTrack((prev) => [...prev, ...file]);
+    setTracks((prev) => [...prev, ...file]);
+  };
+
+  const handleClickTimeline = ({ nativeEvent }) => {
+    const pixelsPerSecond =
+      (timelineWidth * TIMELINE_PADDING.DECREASE) / mainAudioFile.duration;
+    const timeInSeconds = nativeEvent.layerX / pixelsPerSecond;
+
+    waveEvents.current.setWaveTime(timeInSeconds);
+    positionInSeconds.current = timeInSeconds;
+  };
+
+  const setPositionOnTimeline = ({ id, positionX }) => {
+    setTracks((state) => {
+      const trackIndex = state.findIndex((track) => track.id === id);
+
+      if (trackIndex >= 0) {
+        const pixelsPerSecond =
+          (timelineWidth * TIMELINE_PADDING.DECREASE) / mainAudioFile.duration;
+
+        const timeInSeconds = positionX / pixelsPerSecond;
+
+        const newState = [
+          ...state.slice(0, trackIndex),
+          {
+            ...state[trackIndex],
+            timeStart: parseFloat(timeInSeconds.toFixed(2)),
+          },
+          ...state.slice(trackIndex + 1),
+        ];
+
+        return newState;
+      }
+
+      return state;
+    });
+  };
+
+  const setWaveItemRef = (value) => {
+    if (!value) return;
+
+    const itemIndex = waveItemRef.current.findIndex(
+      (item) => item.id === value.id
+    );
+
+    if (itemIndex >= 0) {
+      waveItemRef.current.filter((item) => item.id !== value.id);
+    } else {
+      waveItemRef.current = [...waveItemRef.current, value];
+    }
+  };
+
+  const getCurrentTracks = () => {
+    const currentTrackIds = [...tracks]
+      .filter(
+        (audio) =>
+          currentTime >= audio.timeStart &&
+          currentTime < audio.timeStart + audio.duration
+      )
+      .map((audio) => audio.id);
+
+    return currentTrackIds;
   };
 
   const toggleAudioPlayback = () => {
     waveEvents.current.TogglePlay();
   };
 
-  const handleClickTimeline = ({ nativeEvent }) => {
-    const pixelsPerSecond =
-      (timelineWidth * TIMELINE_PADDING.DECREASE) / mainAudioTimeInfo.duration;
-    const timeInSeconds = nativeEvent.layerX / pixelsPerSecond;
+  const toggleTracksPlayback = (trackId) => {
+    const track = waveItemRef.current.find(({ id }) => id === trackId);
 
-    waveEvents.current.setWaveTime(timeInSeconds);
+    if (track) {
+      const isMainAudioPlaying = waveEvents.current.isPlaying();
+      const isTrackPlaying = track.isPlaying();
+
+      if (isMainAudioPlaying !== isTrackPlaying) {
+        track.TogglePlay();
+      }
+    }
   };
+
+  const adjustWaveTrackTime = (positionInSeconds) => {
+    const trackIds = getCurrentTracks();
+
+    if (trackIds.length > 0) {
+      trackIds.forEach((trackId) => {
+        const track = waveItemRef.current.find(({ id }) => id === trackId);
+
+        if (track) {
+          const { timeStart } = tracks.find(({ id }) => id === trackId);
+          const newTime = positionInSeconds - timeStart;
+
+          track.setWaveTime(newTime);
+        }
+      });
+      return;
+    }
+
+    waveItemRef.current.forEach((track) => {
+      if (track.isPlaying()) {
+        track.TogglePlay();
+      }
+
+      const { timeStart, duration } = tracks.find(({ id }) => id === track.id);
+      const timeOffset = positionInSeconds - timeStart;
+      const newTime = Math.min(Math.max(timeOffset, 0), duration);
+
+      track.setWaveTime(newTime);
+    });
+  };
+
+  useEffect(() => {
+    adjustWaveTrackTime(positionInSeconds.current);
+  }, [positionInSeconds.current]);
+
+  useEffect(() => {
+    const trackIds = getCurrentTracks();
+    if (trackIds.length > 0) {
+      trackIds.forEach(toggleTracksPlayback);
+    }
+  }, [currentTime]);
 
   useEffect(() => {
     if (!timelineWidth) return;
@@ -101,28 +206,30 @@ export function MultiChannelAudio() {
               className="h-[36px] z-[30] absolute top-0 bg-neutral-100 rounded flex-shrink-0"
               onClick={handleClickTimeline}
             >
-              <TimeLine
-                ref={timelineRef}
-                duration={mainAudioTimeInfo.duration}
-              />
+              <TimeLine ref={timelineRef} duration={mainAudioFile.duration} />
             </div>
 
             <Tracker
               width={timelineWidth}
-              duration={mainAudioTimeInfo.duration}
-              currentTime={mainAudioTimeInfo.currentTime}
+              duration={mainAudioFile.duration}
+              currentTime={currentTime}
             />
             <ul
               data-component="wave-draggable-list"
               className="h-full overflow-hidden rounded relative"
             >
-              {track.map(({ id, url, name }) => (
-                <WaveDraggable key={id} id={id}>
+              {tracks.map(({ id, url, name }) => (
+                <WaveDraggable
+                  key={id}
+                  id={id}
+                  onPosition={setPositionOnTimeline}
+                >
                   <WavePlayerItem
+                    ref={setWaveItemRef}
                     id={id}
                     url={url}
                     name={name}
-                    duration={mainAudioTimeInfo.duration}
+                    duration={mainAudioFile.duration}
                   />
                 </WaveDraggable>
               ))}
@@ -150,26 +257,29 @@ export function MultiChannelAudio() {
   );
 }
 
-function WavePlayerItem({ duration: totalDuration, ...props }) {
-  const minPixelPerSec = useMemo(() => {
-    const timelineElement = document.querySelector(
-      'div[data-component="timeline"]'
+const WavePlayerItem = forwardRef(
+  ({ duration: totalDuration, ...props }, ref) => {
+    const minPixelPerSec = useMemo(() => {
+      const timelineElement = document.querySelector(
+        'div[data-component="timeline"]'
+      );
+      const widthOfTimeline = timelineElement?.clientWidth;
+
+      return (widthOfTimeline * TIMELINE_PADDING.DECREASE) / totalDuration;
+    }, [totalDuration]);
+
+    return (
+      <WavePlayer
+        {...props}
+        ref={ref}
+        minPxPerSec={minPixelPerSec}
+        interact={false}
+        // hasPlugins={false}
+        hiddenTime
+      />
     );
-    const widthOfTimeline = timelineElement?.clientWidth;
-
-    return (widthOfTimeline * TIMELINE_PADDING.DECREASE) / totalDuration;
-  }, [totalDuration]);
-
-  return (
-    <WavePlayer
-      {...props}
-      minPxPerSec={minPixelPerSec}
-      interact={false}
-      hasPlugins={false}
-      hiddenTime
-    />
-  );
-}
+  }
+);
 
 const TimeLine = forwardRef(({ duration, slider = 1 }, ref) => {
   const timeLineNumbers = Array.from(
@@ -210,7 +320,7 @@ const TimeLine = forwardRef(({ duration, slider = 1 }, ref) => {
   ) : null;
 });
 
-function WaveDraggable({ id, children }) {
+function WaveDraggable({ id, children, onPosition }) {
   const [{ x, y }, setCoordinates] = useState({ x: 0, y: 0 });
 
   const sensors = useSensors(
@@ -219,14 +329,22 @@ function WaveDraggable({ id, children }) {
     useSensor(KeyboardSensor)
   );
 
+  const handleDragEnd = ({ delta }) => {
+    setCoordinates(({ x, y }) => ({ x: x + delta.x, y: y + delta.y }));
+  };
+
+  useEffect(() => {
+    if (onPosition) {
+      onPosition({ id, positionX: x });
+    }
+  }, [x]);
+
   return (
     <li className="border-[color:var(--clr-body)] first:border-none border-t-2 border-dashed py-2 w-full">
       <DndContext
         sensors={sensors}
         modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
-        onDragEnd={({ delta }) =>
-          setCoordinates(({ x, y }) => ({ x: x + delta.x, y: y + delta.y }))
-        }
+        onDragEnd={handleDragEnd}
       >
         <WaveDraggableItem id={id} style={{ top: y, left: x }}>
           {children}
@@ -298,15 +416,13 @@ function ButtonPlay({ onClick }) {
       className="button button--icon__small self-start"
       onClick={toggleAudioPlayback}
     >
-      {playbackIconState ? (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
+        {playbackIconState ? (
           <path d="M48 64C21.5 64 0 85.5 0 112V400c0 26.5 21.5 48 48 48H80c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H48zm192 0c-26.5 0-48 21.5-48 48V400c0 26.5 21.5 48 48 48h32c26.5 0 48-21.5 48-48V112c0-26.5-21.5-48-48-48H240z" />
-        </svg>
-      ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
+        ) : (
           <path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z" />
-        </svg>
-      )}
+        )}
+      </svg>
     </button>
   );
 }
@@ -333,6 +449,7 @@ WavePlayerItem.propTypes = {
 WaveDraggable.propTypes = {
   children: PropTypes.element,
   id: PropTypes.string.isRequired,
+  onPosition: PropTypes.func,
 };
 
 WaveDraggableItem.propTypes = {

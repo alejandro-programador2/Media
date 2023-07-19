@@ -5,16 +5,28 @@ import css from "./FileAudio.module.css";
 export function FileAudio({ multiple, onFile, label, rounded, className }) {
   const inputId = useId();
 
-  const handleChange = ({ target }) => {
-    const files = Array.from(target.files, (file) => ({
-      id: crypto.randomUUID(),
-      name: file.name.replace(/\.mp3$/, ""),
-      url: URL.createObjectURL(file),
-      file,
-    }));
+  const handleChange = async ({ target }) => {
+    const files = Promise.all(
+      Array.from(target.files, async (file) => {
+        const url = URL.createObjectURL(file);
+        const audio = new Audio(url);
+
+        await new Promise((resolve) => {
+          audio.onloadedmetadata = resolve;
+        });
+
+        return {
+          id: crypto.randomUUID(),
+          name: file.name.replace(/\.mp3$/, ""),
+          url,
+          duration: audio.duration,
+          file,
+        };
+      })
+    );
 
     if (onFile) {
-      onFile([...files]);
+      onFile([...(await files)]);
     }
   };
 
