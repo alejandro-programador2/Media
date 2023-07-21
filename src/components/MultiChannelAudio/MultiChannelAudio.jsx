@@ -312,7 +312,7 @@ const WavePlayerItem = forwardRef(
         ref={ref}
         minPxPerSec={minPixelPerSec}
         interact={false}
-        // hasPlugins={false}
+        hasPlugins={false}
         hiddenTime
       />
     );

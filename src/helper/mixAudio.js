@@ -8,7 +8,6 @@ function segundosAMilisegundos(segundos) {
 
 const mixAudio = async ({ files }) => {
     const audioFiles = [...files]
-    console.log("🚀 ~ file: mixAudio.js:11 ~ mixAudio ~ audioFiles:", audioFiles)
     let filterComplex = "";
 
     // load ffmpeg
