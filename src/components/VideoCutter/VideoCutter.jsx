@@ -84,9 +84,19 @@ function useResize(ref) {
 export function VideoCutter() {
   const [file, setFile] = useState();
   const [frames, setFrames] = useState([]);
+  const [width, setWidth] = useState(0)
 
   const videoRef = useRef();
   const canvasRef = useRef();
+  const containerRef = useRef();
+
+
+  useEffect(() => {
+    if (containerRef.current) {
+      // console.log(containerRef.current.clientWidth)
+      setWidth(containerRef.current.clientWidth)
+    }
+  }, [containerRef.current?.clientWidth])
 
   const handleFile = (file) => {
     setFile(...file);
@@ -116,8 +126,13 @@ export function VideoCutter() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
+    console.log(containerRef.current.clientWidth)
+
+    const SIZE_SCREENSHOT= 96
     const durationInSeconds = video.duration;
-    const frameRate = 10;
+
+    const minPxPerSec = containerRef.current.clientWidth / durationInSeconds;
+    const frameRate = SIZE_SCREENSHOT / minPxPerSec;
 
     const duration = Array.from(
       { length: Math.floor(durationInSeconds / frameRate) },
@@ -157,7 +172,7 @@ export function VideoCutter() {
             className="aspect-video m-auto"
             onLoadedData={handleFrames}
           ></video>
-          <div className="relative border-[color:var(--clr-body)] border-4 rounded-md py-2 overflow-hidden">
+          <div className="relative border-[color:var(--clr-body)] border-4 rounded-md py-2 overflow-hidden" ref={containerRef}>
             <ul className="flex wrapper overflow-x-auto snap-x">
               {frames.map(({ id, url }) => (
                 <li key={id} className="w-24 shrink-0 grow-0">
