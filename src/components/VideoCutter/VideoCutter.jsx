@@ -6,13 +6,12 @@ import cutVideo from "../../helper/cutVideo";
 
 import css from "./VideoCutter.module.css";
 
-function useResize(elementRef) {
+function useResize({ container, video: videoRef, parent: parentRef }) {
   const [styles, setStyles] = useState({ left: "0%", right: "0%" });
 
+  const time = useRef({ start: 0, end: 0 });
   const startXRef = useRef(0);
   const isResizingRef = useRef(false);
-
-  const threshold = 10;
 
   const isValidElement = (element) =>
     typeof element === "string" ||
@@ -21,92 +20,111 @@ function useResize(elementRef) {
 
   const validateResizeSideData = useCallback(() => {
     if (
-      !elementRef.current.querySelector('[data-resize-side="left"]') ||
-      !elementRef.current.querySelector('[data-resize-side="right"]')
+      !container.querySelector('[data-resize-side="left"]') ||
+      !container.querySelector('[data-resize-side="right"]')
     ) {
       throw new Error(
         'You need to put the "data-resize-side" prop in someone element.'
       );
     }
-  }, [elementRef]);
+  }, [container]);
 
   const onPointerDown = (event) => {
+    // Verificar si el botón clickeado es el botón derecho
     if (event?.button === 2) return;
+    // Verificar si el elemento clickeado tiene el atributo 'resizeSide'
     if (!event.target.dataset?.resizeSide) return;
 
+    // Prevenir que otros controladores de eventos respondan al evento
     event.stopPropagation();
     event.preventDefault();
 
+    // Marcar que se está redimensionando
     isResizingRef.current = true;
+    // Guardar la posición inicial del puntero
     startXRef.current = event.clientX;
 
-    const handle = event.srcElement.dataset.resizeSide;
+    // Obtener el lado de redimensionamiento del elemento clickeado
+    const handle = event.target.dataset.resizeSide;
 
     const onPointerMove = (event) => {
+      // Prevenir que otros controladores de eventos respondan al evento
       event.stopPropagation();
       event.preventDefault();
 
+      // Obtener la posición actual del puntero
       const x = event.clientX;
+      // Calcular el cambio en la posición X
+      const deltaX = x - startXRef.current;
+      // Calcular el cambio en segundos basado en la posición X
+      const deltaSeconds = (deltaX / parentRef.clientWidth) * videoRef.duration;
 
-      setStyles((prevStyles) => {
-        const { left, right } = prevStyles;
-        const start = parseFloat(left);
-        const end = parseFloat(right);
+      // Actualizar el tiempo de inicio o fin según el lado de redimensionamiento
+      const newStart =
+        !handle || handle === "left"
+          ? time.current.start + deltaSeconds
+          : time.current.start;
 
-        if (Math.abs(x - startXRef.current) >= threshold) {
-          const sizeParentElement =
-            document.querySelector("div#container").clientWidth;
-          const totalDuration = document.querySelector("video").duration;
+      const newEnd =
+        !handle || handle === "right"
+          ? time.current.end + deltaSeconds
+          : time.current.end;
 
-          const deltaX = x - startXRef.current;
-          const deltaSeconds = (deltaX / sizeParentElement) * totalDuration;
+      if (newStart >= 0 && newEnd <= videoRef.duration ) {
+        // Actualizar los valores de tiempo actuales
+        time.current.start = newStart;
+        time.current.end = newEnd;
 
-          const newLeft =
-            handle === "left"
-              ? ((start + deltaSeconds) / totalDuration) * 100
-              : start;
+        // Calcular nuevas posiciones para los lados izquierdo y derecho
+        const newLeft = (time.current.start / videoRef.duration) * 100;
+        const newRight =
+          ((videoRef.duration - time.current.end) / videoRef.duration) * 100;
 
-          const newRight =
-            handle === "right"
-              ? ((totalDuration - (end + deltaSeconds)) / totalDuration) * 100
-              : end;
+        // Aplicar estilos actualizados al elemento redimensionado
+        setStyles({
+          left: `${newLeft * (parentRef.clientWidth / videoRef.duration)}px`,
+          right: `${newRight * (parentRef.clientWidth / videoRef.duration)}px`,
+        });
 
-          return {
-            ...styles,
-            left: `${newLeft}%`,
-            right: `${newRight}%`,
-          };
-        }
-        return prevStyles;
-      });
-
-      // Update the startX reference
-      startXRef.current = x / 2;
+        // Actualizar la posición inicial del puntero
+        startXRef.current = x;
+      }
     };
 
     const onPointerUp = () => {
       if (isResizingRef.current) {
+        // Finalizar el proceso de redimensionamiento
         isResizingRef.current = false;
+        // Eliminar los controladores de eventos de movimiento y liberación
         document.removeEventListener("pointermove", onPointerMove);
         document.removeEventListener("pointerup", onPointerUp);
       }
     };
 
+    // Agregar controladores de eventos para movimiento y liberación
     document.addEventListener("pointermove", onPointerMove);
     document.addEventListener("pointerup", onPointerUp);
   };
 
   useEffect(() => {
-    if (isValidElement(elementRef) || validateResizeSideData() instanceof Error)
+    // Verificar si el 'container' es un elemento válido o si los datos del redimensionamiento no son válidos
+    if (isValidElement(container) || validateResizeSideData() instanceof Error)
       return;
 
-    // Agregar escuchadores de eventos
-    elementRef.current.addEventListener("pointerdown", onPointerDown);
+    // Agregar escuchador de eventos 'pointerdown' al 'container' cuando el componente se monta
+    container.addEventListener("pointerdown", onPointerDown);
 
+    // Eliminar el escuchador de eventos 'pointerdown' cuando el componente se desmonta
     return () => {
-      elementRef.current?.removeEventListener("pointerdown", onPointerDown);
+      container?.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [elementRef]);
+  }, [container]);
+
+  useEffect(() => {
+    if (videoRef) {
+      time.current.end = videoRef.duration;
+    }
+  }, [videoRef]);
 
   return {
     styles,
@@ -251,7 +269,11 @@ export function VideoCutter() {
               ))}
             </ul>
 
-            <ResizeAudio onResize={handleResize} />
+            <ResizeAudio
+              onResize={handleResize}
+              videoRef={videoRef}
+              containerRef={containerRef}
+            />
 
             <canvas
               ref={canvasRef}
@@ -271,23 +293,28 @@ export function VideoCutter() {
   );
 }
 
-function ResizeAudio({ onResize }) {
-  const containerRef = useRef();
-  const { styles } = useResize(containerRef);
+function ResizeAudio({ onResize, videoRef, containerRef }) {
+  const ref = useRef();
+
+  const { styles } = useResize({
+    container: ref.current,
+    video: videoRef.current,
+    parent: containerRef.current,
+  });
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!ref.current) return;
 
     if (onResize) {
       onResize({
-        offsetLeft: containerRef.current?.offsetLeft ?? 0,
-        width: containerRef.current?.clientWidth ?? 0,
+        offsetLeft: ref.current?.offsetLeft ?? 0,
+        width: ref.current?.clientWidth ?? 0,
       });
     }
   }, [onResize, styles]);
 
   return (
-    <div ref={containerRef} className={css.resize} style={{ ...styles }}>
+    <div ref={ref} className={css.resize} style={{ ...styles }}>
       <span data-resize-side="left" className={css.resize__side}></span>
       <span data-resize-side="right" className={css.resize__side}></span>
     </div>
@@ -335,6 +362,8 @@ function Tracker({ videoRef }) {
 
 ResizeAudio.propTypes = {
   onResize: PropTypes.func,
+  videoRef: PropTypes.any,
+  containerRef: PropTypes.any,
 };
 
 Tracker.propTypes = {
