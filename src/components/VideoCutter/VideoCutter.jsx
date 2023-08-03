@@ -1,13 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import PropTypes from "prop-types";
+
 import { FileAudio } from "../FileAudio";
+import cutVideo from "../../helper/cutVideo";
 
-import css from './VideoCutter.module.css'
+import css from "./VideoCutter.module.css";
 
-function useResize(ref) {
-  const [isResizing, setisResizing] = useState(false);
-  const [styles, setStyles] = useState({ width: "400px" });
+function useResize(elementRef) {
+  const [styles, setStyles] = useState({ left: "0%", right: "0%" });
 
-  const resizeOptions = useRef({});
+  const startXRef = useRef(0);
+  const isResizingRef = useRef(false);
+
+  const threshold = 10;
 
   const isValidElement = (element) =>
     typeof element === "string" ||
@@ -15,66 +20,93 @@ function useResize(ref) {
     typeof element !== "object";
 
   const validateResizeSideData = useCallback(() => {
-    if (!ref.current.querySelector('[data-resize-side="true"]')) {
+    if (
+      !elementRef.current.querySelector('[data-resize-side="left"]') ||
+      !elementRef.current.querySelector('[data-resize-side="right"]')
+    ) {
       throw new Error(
         'You need to put the "data-resize-side" prop in someone element.'
       );
     }
-  }, [ref]);
+  }, [elementRef]);
 
-  useEffect(() => {
-    if (isValidElement(ref) || validateResizeSideData() instanceof Error)
-      return;
+  const onPointerDown = (event) => {
+    if (event?.button === 2) return;
+    if (!event.target.dataset?.resizeSide) return;
 
-    const { current: element } = ref;
+    event.stopPropagation();
+    event.preventDefault();
 
-    const onPointerMove = ({ clientX }) => {
-      if (!isResizing) return;
-      console.log("onPointerMove", isResizing);
+    isResizingRef.current = true;
+    startXRef.current = event.clientX;
+
+    const handle = event.srcElement.dataset.resizeSide;
+
+    const onPointerMove = (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+
+      const x = event.clientX;
 
       setStyles((prevStyles) => {
-        const { start, width } = resizeOptions.current;
+        const { left, right } = prevStyles;
+        const start = parseFloat(left);
+        const end = parseFloat(right);
 
-        const deltaX = clientX - start;
-        const newWidth = `${width + deltaX}px`;
+        if (Math.abs(x - startXRef.current) >= threshold) {
+          const sizeParentElement =
+            document.querySelector("div#container").clientWidth;
+          const totalDuration = document.querySelector("video").duration;
 
-        return {
-          ...prevStyles,
-          width: newWidth,
-        };
+          const deltaX = x - startXRef.current;
+          const deltaSeconds = (deltaX / sizeParentElement) * totalDuration;
+
+          const newLeft =
+            handle === "left"
+              ? ((start + deltaSeconds) / totalDuration) * 100
+              : start;
+
+          const newRight =
+            handle === "right"
+              ? ((totalDuration - (end + deltaSeconds)) / totalDuration) * 100
+              : end;
+
+          return {
+            ...styles,
+            left: `${newLeft}%`,
+            right: `${newRight}%`,
+          };
+        }
+        return prevStyles;
       });
-    };
 
-    const onPointerDown = (event) => {
-      if (!event.srcElement.dataset?.resizeSide) return;
-      console.log("onPointerDown", isResizing);
-
-      resizeOptions.current = {
-        start: event.clientX,
-        width: parseInt(styles.width),
-      };
-
-      setisResizing(true);
+      // Update the startX reference
+      startXRef.current = x / 2;
     };
 
     const onPointerUp = () => {
-      if (isResizing) {
-        console.log("onPointerUp", isResizing);
-        setisResizing(!isResizing);
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.removeEventListener("pointermove", onPointerMove);
+        document.removeEventListener("pointerup", onPointerUp);
       }
     };
 
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+  };
+
+  useEffect(() => {
+    if (isValidElement(elementRef) || validateResizeSideData() instanceof Error)
+      return;
+
     // Agregar escuchadores de eventos
-    element.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("mousemove", onPointerMove);
-    document.addEventListener("mouseup", onPointerUp);
+    elementRef.current.addEventListener("pointerdown", onPointerDown);
 
     return () => {
-      element.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("mousemove", onPointerMove);
-      document.removeEventListener("mouseup", onPointerUp);
+      elementRef.current?.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [ref, isResizing, validateResizeSideData, styles.width]);
+  }, [elementRef]);
 
   return {
     styles,
@@ -84,19 +116,11 @@ function useResize(ref) {
 export function VideoCutter() {
   const [file, setFile] = useState();
   const [frames, setFrames] = useState([]);
-  const [width, setWidth] = useState(0)
 
   const videoRef = useRef();
   const canvasRef = useRef();
   const containerRef = useRef();
-
-
-  useEffect(() => {
-    if (containerRef.current) {
-      // console.log(containerRef.current.clientWidth)
-      setWidth(containerRef.current.clientWidth)
-    }
-  }, [containerRef.current?.clientWidth])
+  const resizeRef = useRef({});
 
   const handleFile = (file) => {
     setFile(...file);
@@ -126,9 +150,7 @@ export function VideoCutter() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    console.log(containerRef.current.clientWidth)
-
-    const SIZE_SCREENSHOT= 96
+    const SIZE_SCREENSHOT = 96;
     const durationInSeconds = video.duration;
 
     const minPxPerSec = containerRef.current.clientWidth / durationInSeconds;
@@ -152,10 +174,45 @@ export function VideoCutter() {
       frames.push(frame);
     }
 
-    console.log(frames);
-
     setFrames(frames);
     video.currentTime = 1;
+  };
+
+  const handleResize = ({ offsetLeft, width }) => {
+    resizeRef.current = {
+      start: offsetLeft,
+      width,
+    };
+  };
+
+  const createDownloadAudioLink = ({ url, name }) => {
+    const downloadAudio = document.createElement("a");
+    downloadAudio.href = url;
+    downloadAudio.style.display = "none";
+
+    downloadAudio.setAttribute("download", name);
+    downloadAudio.click();
+  };
+
+  const exportVideoFile = async () => {
+    try {
+      const PixelPerSecond =
+        containerRef.current.clientWidth / videoRef.current.duration;
+      const startTime = resizeRef.current.start / PixelPerSecond;
+      const endTime = resizeRef.current.width / PixelPerSecond + startTime;
+
+      // Mix the audio with the main audio file and other tracks
+      const newAudio = await cutVideo({
+        file: file.file,
+        startTime,
+        endTime,
+      });
+
+      // Create a link to download the new audio
+      createDownloadAudioLink(newAudio);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (
@@ -172,16 +229,29 @@ export function VideoCutter() {
             className="aspect-video m-auto"
             onLoadedData={handleFrames}
           ></video>
-          <div className="relative border-[color:var(--clr-body)] border-4 rounded-md py-2 overflow-hidden" ref={containerRef}>
-            <ul className="flex wrapper overflow-x-auto snap-x">
+          <div
+            id="container"
+            className="relative border-[color:var(--clr-body)] border-4 rounded-md overflow-hidden"
+            ref={containerRef}
+          >
+            <Tracker videoRef={videoRef.current} />
+
+            <ul className="flex wrapper overflow-x-auto snap-x pointer-events-none">
               {frames.map(({ id, url }) => (
-                <li key={id} className="w-24 shrink-0 grow-0">
-                  <img src={url} alt="" className="w-full h-auto block" />
+                <li
+                  key={id}
+                  className="w-24 shrink-0 grow-0 pointer-events-none"
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    className="w-full h-auto block pointer-events-none "
+                  />
                 </li>
               ))}
             </ul>
 
-            <ResizeAudio/>
+            <ResizeAudio onResize={handleResize} />
 
             <canvas
               ref={canvasRef}
@@ -190,20 +260,83 @@ export function VideoCutter() {
               className="hidden"
             />
           </div>
+          <div className="flex justify-between">
+            <button className="button" onClick={exportVideoFile}>
+              Export
+            </button>
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function ResizeAudio() {
+function ResizeAudio({ onResize }) {
   const containerRef = useRef();
   const { styles } = useResize(containerRef);
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    if (onResize) {
+      onResize({
+        offsetLeft: containerRef.current?.offsetLeft ?? 0,
+        width: containerRef.current?.clientWidth ?? 0,
+      });
+    }
+  }, [onResize, styles]);
+
   return (
     <div ref={containerRef} className={css.resize} style={{ ...styles }}>
-      <span data-resize-side className={css.resize__side}></span>
-      <span data-resize-side className={css.resize__side}></span>
+      <span data-resize-side="left" className={css.resize__side}></span>
+      <span data-resize-side="right" className={css.resize__side}></span>
     </div>
   );
 }
+
+function Tracker({ videoRef }) {
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    if (!videoRef) return;
+
+    const updateTime = () => {
+      const newCurrentTime = videoRef.currentTime;
+      const durationVideo = videoRef.duration;
+      const containerElement = document.querySelector("div#container");
+
+      setCurrentTime(
+        Math.floor(
+          (newCurrentTime / durationVideo) * containerElement.clientWidth
+        )
+      );
+    };
+
+    // Agregar el event listener al evento timeupdate
+    videoRef.addEventListener("timeupdate", updateTime);
+
+    return () => {
+      videoRef.removeEventListener("timeupdate", updateTime);
+    };
+  }, [videoRef]);
+
+  return (
+    <div
+      className="bg-teal-500 absolute h-full w-[2px] z-[40] top-0 cursor-ew-resize"
+      style={{
+        left: `${currentTime}px`,
+      }}
+    >
+      <div className="bg-teal-500 absolute w-[12px] h-[12px] rounded-sm top-0 left-[calc(50%+1px)] -translate-x-1/2"></div>
+      <div className="bg-teal-500 absolute w-[9px] h-[9px] rounded-sm rotate-45 top-[6px] left-[calc(50%+1px)] -translate-x-1/2"></div>
+    </div>
+  );
+}
+
+ResizeAudio.propTypes = {
+  onResize: PropTypes.func,
+};
+
+Tracker.propTypes = {
+  videoRef: PropTypes.object,
+};
