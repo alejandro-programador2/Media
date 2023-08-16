@@ -44,6 +44,12 @@ function addTrack(track) {
       segmentDrag.posX = segmentDrag.me.offset().left + segmentDrag.segmentW - e.pageX;
       segmentDrag.posY = segmentDrag.me.offset().top + segmentDrag.segmentH - e.pageY;
       
+      // Se calculan las posiciones del segmento de la pista en relación con el puntero del mouse o el dedo (e.pageX y e.pageY).
+      // Esto permitirá posicionar correctamente el segmento mientras el usuario lo arrastra.
+
+      segmentDrag.offX = segmentDrag.me.offset().left;
+      segmentDrag.offY = segmentDrag.me.offset().top;
+      
       // Se guardan las posiciones iniciales del segmento de la pista (sin ajustar por el puntero del mouse o el dedo) en las variables "segmentDrag.offX" y "segmentDrag.offY".
 
       segmentDrag.cursorX = e.pageX;

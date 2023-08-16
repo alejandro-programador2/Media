@@ -1,6 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
-import { ErrorPage, Join, Home, Cut, MultiChannel, CutVideo } from "./pages";
+import { ErrorPage, Join, Home, Cut, MultiChannel, CutVideo, JoinVideo } from "./pages";
 import Layout from "./layout/Layout";
 
 function App() {
@@ -30,6 +30,10 @@ function App() {
         {
           path: "cut-video",
           element: <CutVideo />,
+        },
+        {
+          path: "join-video",
+          element: <JoinVideo />,
         },
       ],
     },

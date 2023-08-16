@@ -115,7 +115,7 @@ h3 {
 }
 
 .wrapper {
-    width: min(100vw - 3rem, var(--container-max, 85ch));
+    width: min(100vw - 3rem, var(--container-max, 120ch));
     margin-inline: auto;
     /* border: 1px solid goldenrod; */
 }

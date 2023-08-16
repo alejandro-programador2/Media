@@ -1,0 +1,39 @@
+.resize__buttons::before {
+    --size: .9375rem;
+    content: "";
+    position: absolute;
+    background-color: #fded70;
+    width: var(--size);
+    top: 0;
+    bottom: 0;
+    box-sizing: border-box;
+    background-position: 50%;
+    background-repeat: no-repeat;
+    background-size: 5px 20px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg width='5' height='20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2.667' cy='2' r='2' fill='%23212123'/%3E%3Ccircle cx='2.667' cy='10' r='2' fill='%23212123'/%3E%3Ccircle cx='2.667' cy='18' r='2' fill='%23212123'/%3E%3C/svg%3E");
+}
+
+.resize__buttons--left,
+.resize__buttons--left::before {
+    left: 1px;
+}
+
+.resize__buttons--right,
+.resize__buttons--right::before
+{
+    right: 1px;
+}
+
+.resize__buttons {
+    position: absolute;
+    box-sizing: border-box;
+    cursor: ew-resize;
+    top: 0;
+    bottom: 0;
+}
+
+.test_drag {
+    transform: translate3d(var(--translate-x, 0), var(--translate-y, 0), 0)
+    scale(var(--scale, 1))
+    
+}
