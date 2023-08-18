@@ -1,5 +1,174 @@
-.resize__buttons::before {
+header {
+    background-color: var(--clr-component);
+}
+
+header div>a {
+    color: var(--clr-white);
+}
+
+.container {
+    --work-area-size: 300px;
+
+    display: grid;
+    height: calc(100svh - var(--header, 0));
+    grid-template-rows: 1fr minmax(9vw, var(--work-area-size));
+    background-color: var(--clr-component);
+}
+
+.container>* {
+    border-top: 1px solid #000000;
+}
+
+.video {
+    display: grid;
+    place-items: center;
+    padding: clamp(1rem, 5%, 1.5rem);
+
+}
+
+.video__base {
+    --background-base: #212123;
+
+    height: 100%;
+
+    border-radius: 0.5rem;
+    background-color: var(--background-base);
+    width: clamp(500px, 50vw, 900px);
+    display: grid;
+    place-content: center;
+    align-items: center;
+}
+
+
+.video__base--hidden {
+    display: none;
+}
+
+.video__element {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background-color: #000000;
+}
+
+.info-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.toolbar {
+    display: flex;
+    justify-content: center;
+    padding-block: clamp(0.5rem, 5%, 0.7rem);
+    /* border: 1px solid #fded70; */
+    background-color: #18181A;
+}
+
+.work-area {
+    /* height: 100%; */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* border: 1px solid blanchedalmond; */
+    flex: 1;
+}
+
+.timeline {
+    /* border: 1px solid greenyellow; */
+}
+
+.track {
+    height: 100%;
+    position: relative;
+    /* border: 1px solid red; */
+    overflow-x: scroll;
+    overflow-y: hidden;
+}
+
+.track::-webkit-scrollbar {
+    height: .375rem;
+}
+
+.track::-webkit-scrollbar-thumb {
+    background-color: #74808C;
+    border-radius: 6px;
+}
+
+.track::-webkit-scrollbar-thumb:hover {
+    background-color: #555;
+}
+
+.track::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+.track>li {
+    height: 100%;
+    position: relative;
+}
+
+.track__item {
+    display: inline-block;
+    position: relative;
+    margin-block-end: .625rem;
+
+    --height: 3.5rem;
+
+    position: relative;
+    height: var(--height);
+    width: 200%;
+    transition: height 33ms linear;
+    border-radius: .3125rem;
+
+    /* border: 2px solid darkmagenta; */
+    background-color: #1A1C20;
+}
+
+.frame {
+    width: 100%;
+    position: relative;
+    height: var(--height);
+}
+
+.drag-item {
+    --track-width: 0px;
+    --track-left: 0px;
+
+    left: var(--track-left, 0);
+    width: var(--track-width, 0);
+    height: var(--height);
+}
+
+.drag-item>div {
+    height: 100%;
+}
+
+.drag-item__track {
+
+    width: auto;
+    height: 100%;
+    overflow: hidden;
+    background-color: #2b2b2e;
+    border-radius: 0.5rem;
+    cursor: default;
+    pointer-events: all;
+    backface-visibility: hidden;
+    transform: translate3d(var(--translate-x), 0, 0) scale(1);
+}
+
+.drag-item__buttons {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    cursor: ew-resize;
+}
+
+.drag-item__buttons::before {
     --size: .9375rem;
+    --border-size: .5rem;
+
     content: "";
     position: absolute;
     background-color: #fded70;
@@ -13,27 +182,16 @@
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg width='5' height='20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2.667' cy='2' r='2' fill='%23212123'/%3E%3Ccircle cx='2.667' cy='10' r='2' fill='%23212123'/%3E%3Ccircle cx='2.667' cy='18' r='2' fill='%23212123'/%3E%3C/svg%3E");
 }
 
-.resize__buttons--left,
-.resize__buttons--left::before {
-    left: 1px;
+.drag-item__buttons--left,
+.drag-item__buttons--left::before {
+    left: 0;
+    border-top-left-radius: var(--border-size);
+    border-bottom-left-radius: var(--border-size);
 }
 
-.resize__buttons--right,
-.resize__buttons--right::before
-{
-    right: 1px;
-}
-
-.resize__buttons {
-    position: absolute;
-    box-sizing: border-box;
-    cursor: ew-resize;
-    top: 0;
-    bottom: 0;
-}
-
-.test_drag {
-    transform: translate3d(var(--translate-x, 0), var(--translate-y, 0), 0)
-    scale(var(--scale, 1))
-    
+.drag-item__buttons--right,
+.drag-item__buttons--right::before {
+    right: 0;
+    border-top-right-radius: var(--border-size);
+    border-bottom-right-radius: var(--border-size);
 }

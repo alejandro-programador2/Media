@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import PropTypes from "prop-types";
+/* eslint-disable react/prop-types */
+import { useState, useRef, useCallback, useEffect, forwardRef } from "react";
+import { FileAudio } from "../FileAudio";
+
 import {
   DndContext,
   KeyboardSensor,
@@ -8,14 +10,19 @@ import {
   TouchSensor,
   MouseSensor,
   useDraggable,
-  useDroppable,
 } from "@dnd-kit/core";
-import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 
-import { Shell } from "../Shell";
-import { FileAudio } from "../FileAudio";
+import styleCSS from "./VideoJoiner.module.css";
+import {
+  restrictToHorizontalAxis,
+  restrictToParentElement,
+} from "@dnd-kit/modifiers";
+import converterTime from "../../helper/converterTime";
 
-import css from "./VideoJoiner.module.css";
+const TIMELINE_PADDING = Object.freeze({
+  INCREASE: 1.05, // 10%
+  DECREASE: 0.9, // It's equal to 90%
+});
 
 function useResize({ container, duration, parent: parentRef }) {
   const [styles, setStyles] = useState({ left: "0px", width: "0px" });
@@ -166,17 +173,18 @@ function useResize({ container, duration, parent: parentRef }) {
   };
 }
 
-function useFrame({ videos, containerWidth, frameSize = 80 }) {
+export const VideoJoiner = () => {
+  const [files, setFiles] = useState([]);
   const [frames, setFrames] = useState([]);
 
-  const drawFrame = (video, canvas, timeInSeconds) => {
+  //   const videoRef = useRef();
+  const canvasRef = useRef();
+  const containerRef = useRef();
+
+  const drawFrame = (video, canvas, ctx, width, height, timeInSeconds) => {
     return new Promise((resolve) => {
       const onTimeUpdateHandler = () => {
-        const ctx = canvas.getContext("2d");
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-
-        ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        ctx.drawImage(video, 0, 0, width, height);
         video.removeEventListener("timeupdate", onTimeUpdateHandler);
 
         const frameDataUrl = canvas.toDataURL();
@@ -192,11 +200,15 @@ function useFrame({ videos, containerWidth, frameSize = 80 }) {
     });
   };
 
-  const handleFrames = async ({ videoElement, canvas, containerWidth }) => {
-    const SIZE_SCREENSHOT = frameSize;
-    const durationInSeconds = videoElement.duration;
+  const handleFrames = async (e) => {
+    const video = e.target;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
 
-    const minPxPerSec = containerWidth / durationInSeconds;
+    const SIZE_SCREENSHOT = 96;
+    const durationInSeconds = video.duration;
+
+    const minPxPerSec = containerRef.current.clientWidth / durationInSeconds;
     const frameRate = SIZE_SCREENSHOT / minPxPerSec;
 
     const duration = Array.from(
@@ -206,164 +218,97 @@ function useFrame({ videos, containerWidth, frameSize = 80 }) {
 
     const frames = [];
     for (const timeInSeconds of duration) {
-      const frame = await drawFrame(videoElement, canvas, timeInSeconds);
+      const frame = await drawFrame(
+        video,
+        canvas,
+        ctx,
+        canvas.width,
+        canvas.height,
+        timeInSeconds
+      );
       frames.push(frame);
     }
 
-    setFrames((prevFrames) => {
-      const filteredFrames = prevFrames.filter(
-        ({ id }) => id !== videoElement.id
-      );
-
-      // Crear un nuevo grupo de fotogramas con la información actualizada
-      const newFrameGroup = {
-        id: videoElement.id,
+    setFrames((prev) => [
+      ...prev,
+      {
+        id: video.id,
         duration: durationInSeconds,
         frames: [...frames],
-      };
-
-      // Agregar el nuevo grupo de fotogramas al arreglo filtrado
-      const updatedFrames = [...filteredFrames, newFrameGroup];
-
-      return updatedFrames;
-    });
+      },
+    ]);
   };
 
-  const createVideoElement = (video) => {
-    // Crear un elemento de video
+  const createVideoElement = (data) => {
     const element = document.createElement("video");
-
-    element.setAttribute("id", video.id);
+    element.setAttribute("id", data.id);
     element.setAttribute("preload", "auto");
-    element.src = video.url;
+    element.src = data.url;
 
-    return element;
+    element.onloadeddata = handleFrames;
   };
-
-  useEffect(() => {
-    if (videos.length === 0) return;
-
-    const createCanvasElement = () => {
-      const canvas = document.createElement("canvas");
-      canvas.setAttribute("width", "640px");
-      canvas.setAttribute("height", "360px");
-      canvas.className = "hidden";
-
-      return canvas;
-    };
-
-    const loadedDataHandler = (videoElement, canvas) =>
-      handleFrames({ videoElement, canvas, containerWidth });
-
-    const videoGroup = videos.map((video) => {
-      const videoElement = createVideoElement(video);
-      const canvas = createCanvasElement();
-
-      videoElement.addEventListener("loadeddata", () =>
-        loadedDataHandler(videoElement, canvas)
-      );
-
-      return videoElement;
-    });
-
-    // Limpia los controladores de evento cuando el componente se desmonta
-    return () => {
-      videoGroup.forEach((video) => {
-        video.removeEventListener("loadeddata", () => loadedDataHandler());
-      });
-    };
-  }, [videos, containerWidth]);
-
-  return { frames };
-}
-
-export const VideoJoiner = () => {
-  const [files, setFiles] = useState([]);
 
   const handleFile = (files) => {
+    files.forEach((video) => {
+      createVideoElement(video);
+    });
+
     setFiles(files);
     console.log("called 👁‍🗨");
   };
 
-  return files.length === 0 ? (
-    <Shell className="content-center text-center">
-      <h1 className="text-[length:var(--fs-500)]">Join Video</h1>
-      <p>Put your audios files and join them into a single file.</p>
-      <FileAudio multiple onFile={handleFile} accept="video/mp4" />
-    </Shell>
-  ) : (
-    <VideoEditor videos={files} />
-  );
-};
-
-function VideoEditor({ videos }) {
-  return (
-    <div className={css.container}>
-      <section className={css.video}>
-        {videos.map((video, index) => (
-          <div
-            key={video.id}
-            className={`${css.video__base} ${
-              index >= 1 && css["video__base--hidden"]
-            }`}
-          >
-            <video
-              src={video.url}
-              preload="metadata"
-              crossOrigin="anonymous"
-              controls
-              className={css.video__element}
-            />
-          </div>
-        ))}
-      </section>
-
-      <section className={css["info-panel"]}>
-        <div className={css["toolbar"]}>▶</div>
-        <VideoFrames videos={videos} />
-      </section>
-    </div>
-  );
-}
-
-function VideoFrames({ videos }) {
-  const containerRef = useRef();
-
-  const { frames } = useFrame({
-    videos,
-    containerWidth: 1901,
-  });
-  console.log("🚀 ~ file: VideoJoiner.jsx:165 ~ VideoFrames ~ frames:", frames);
+  // console.log(containerRef.current?.clientWidth)
 
   return (
-    <div className={css["work-area"]}>
-      <div className={css.timeline}></div>
-      <ol className={css.track} ref={containerRef}>
-        <li>
+    <div className="flow">
+      {files.length === 0 ? (
+        <FileAudio multiple onFile={handleFile} accept="video/mp4" />
+      ) : (
+        <div className="flow py-4">
+          <video
+            preload="auto"
+            src={files[0]?.url}
+            controls
+            className="aspect-video m-auto"
+          ></video>
           <div
-            className={css.track__item}
-            style={{ maxWidth: `${1320 * frames.length}px`, width: "100%" }}
+            ref={containerRef}
+            id="container"
+            className="flex relative border-[color:var(--clr-body)] border-4 rounded-md  py-9 my-2 w-full overflow-x-auto"
           >
-            {frames.map(({ id, duration, frames }) => (
+            <div className="h-[36px] z-[30] absolute top-0 bg-neutral-100 rounded flex-shrink-0">
+              <TimeLine
+                countVideos={frames.length}
+                containerRef={containerRef}
+                duration={frames.reduce((t, frame) => t + frame.duration, 0)}
+              />
+            </div>
+
+            {frames.map((group) => (
               <Drag
-                key={id}
-                id={id}
-                duration={duration}
+                key={group.id}
+                id={group.id}
+                duration={group.duration}
                 containerRef={containerRef}
               >
-                <Frames frames={frames} />
+                <FrameVideo frames={group.frames} />
               </Drag>
             ))}
           </div>
-        </li>
-        <li>2</li>
-      </ol>
+          <canvas
+            ref={canvasRef}
+            width="640px"
+            height="360px"
+            className="hidden"
+          />
+        </div>
+      )}
     </div>
   );
-}
+};
 
-function Drag({ children, ...props }) {
-  const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
+function Drag({ children, onPositionUpdate, ...props }) {
+  const [{ x }, setCoordinates] = useState({ x: 0 });
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -374,31 +319,16 @@ function Drag({ children, ...props }) {
   const handleDragEnd = (e) => {
     console.log(e);
     const { delta } = e;
-    const { x: axisX, y: axisY } = coordinates;
-
-    // const dragElements = document.querySelectorAll('div[data-element="drag"]')
-
-    const newCoordinates = {
-      x: axisX + delta.x,
-      y: axisY + delta.y,
-    };
-
-    // setCoordinates(({ x, y }) => ({ x: x + delta.x, y: y + delta.y }));
-    setCoordinates(newCoordinates);
-  };
-
-  const customCollisionDetectionAlgorithm = (e) => {
-    console.log(e);
+    setCoordinates(({ x }) => ({ x: x + delta.x }));
   };
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={customCollisionDetectionAlgorithm}
       modifiers={[restrictToHorizontalAxis]}
       onDragEnd={handleDragEnd}
     >
-      <Drag.Item axisX={coordinates.x} {...props}>
+      <Drag.Item axisX={x} {...props}>
         {children}
       </Drag.Item>
     </DndContext>
@@ -407,7 +337,6 @@ function Drag({ children, ...props }) {
 
 const Item = ({ children, id, containerRef, duration, axisX }) => {
   const { listeners, setNodeRef, transform } = useDraggable({ id });
-
   const refContainer = useRef();
 
   const {
@@ -418,74 +347,94 @@ const Item = ({ children, id, containerRef, duration, axisX }) => {
     duration,
   });
 
+  const elementLeft = parseInt(left) + axisX;
+
   const elementStyle = {
     "--translate-x": `${transform?.x ?? 0}px`,
-    "--track-left": `${parseInt(left) + axisX}px`,
-    "--track-width": width,
+    left: elementLeft,
+    width,
   };
 
   return (
     <div
-      className={` absolute ${css["drag-item"]}`}
-      style={elementStyle}
+      className="relative h-14 w-auto border-2 border-green-400"
+      ref={setNodeRef}
+      {...listeners}
     >
-      <div ref={setNodeRef}>
-        <div
-          ref={refContainer}
-          className={` ${css["drag-item__track"]}`}
-          data-element="drag"
-          {...listeners}
-        >
-          {children}
-          <span
-            data-resize-side="left"
-            className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--left"]}`}
-          ></span>
-          <span
-            data-resize-side="right"
-            className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--right"]}`}
-          ></span>
-        </div>
+      <div
+        style={elementStyle}
+        ref={refContainer}
+        className={`absolute top-0 h-full cursor-default border-4 border-red-400 overflow-x-hidden overflow-y-hidden ${styleCSS.test_drag}`}
+      >
+        {children}
+
+        <span
+          data-resize-side="left"
+          className={`${styleCSS.resize__buttons} ${styleCSS["resize__buttons--left"]}`}
+        ></span>
+        <span
+          data-resize-side="right"
+          className={`${styleCSS.resize__buttons} ${styleCSS["resize__buttons--right"]}`}
+        ></span>
       </div>
     </div>
   );
 };
-function Frames({ frames }) {
-  return (
-    <div className={css.frame}>
-      <ul className="flex items-center h-full">
-        {frames.map(({ id, url }) => (
-          <li key={id} className="w-20 shrink-0 grow-0 ">
-            <img src={url} alt="" className="w-full h-auto block" />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 Drag.Item = Item;
 
-Drag.propTypes = {
-  children: PropTypes.any,
-};
+const TimeLine = forwardRef(({ duration, countVideos, containerRef }, ref) => {
+  const LINE_SIZE = 16;
 
-Item.propTypes = {
-  children: PropTypes.any,
-  id: PropTypes.string,
-  containerRef: PropTypes.any,
-  duration: PropTypes.number,
-  axisX: PropTypes.number,
-};
+  const minPxPerSec = (1383 * countVideos) / duration;
+  const slider = LINE_SIZE / minPxPerSec;
 
-VideoEditor.propTypes = {
-  videos: PropTypes.array,
-};
+  const timeLineNumbers = Array.from(
+    { length: Math.floor((duration * TIMELINE_PADDING.INCREASE) / slider) },
+    (_, i) => i * slider
+  );
 
-VideoFrames.propTypes = {
-  videos: PropTypes.array,
-};
+  const lines = timeLineNumbers.map((_, i) => {
+    const visibleNumber = (Math.round(i * 100) / 100) % 5 === 0;
 
-Frames.propTypes = {
-  frames: PropTypes.array,
-};
+    return (
+      <div
+        key={i}
+        className="select-none pointer-events-none flex flex-col items-center relative"
+      >
+        {visibleNumber && (
+          <>
+            <small className="text-[11px] absolute bottom-[16px] text-gray-300 font-bold">
+              {i === 0 ? 0 : converterTime(timeLineNumbers[i])}
+            </small>
+            <div className="bg-gray-300 flex-shrink-0 absolute bottom-0 w-[2px] h-[14px]"></div>
+          </>
+        )}
+        <div className="bg-gray-300 flex-shrink-0 absolute bottom-0 w-[1px] h-[9px]"></div>
+      </div>
+    );
+  });
+
+  return duration ? (
+    <div
+      ref={ref}
+      data-component="timeline"
+      className="px-[4.8px] w-full h-full items-end flex"
+      style={{ gap: `${LINE_SIZE}px` }}
+    >
+      {lines}
+    </div>
+  ) : null;
+});
+
+function FrameVideo({ frames }) {
+  return (
+    <ul className="flex">
+      {frames.map(({ id, url }) => (
+        <li key={id} className="w-24 shrink-0 grow-0 ">
+          <img src={url} alt="" className="w-full h-auto block" />
+        </li>
+      ))}
+    </ul>
+  );
+}

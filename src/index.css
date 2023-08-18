@@ -30,6 +30,7 @@
     --clr-secondary: rgb(59, 48, 84);
     --clr-accent: rgb(239, 240, 245);
     --clr-white: hsl(0, 0%, 100%);
+    --clr-component: #18181A;
 
     --fs--200: clamp(0.69rem, calc(0.66rem + 0.14vw), 0.78rem);
     --fs--100: clamp(0.78rem, calc(0.72rem + 0.24vw), 0.94rem);
