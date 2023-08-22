@@ -8,7 +8,6 @@ import {
   TouchSensor,
   MouseSensor,
   useDraggable,
-  useDroppable,
 } from "@dnd-kit/core";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 
@@ -16,8 +15,9 @@ import { Shell } from "../Shell";
 import { FileAudio } from "../FileAudio";
 
 import css from "./VideoJoiner.module.css";
+import converterTime from "../../helper/converterTime";
 
-function useResize({ container, duration, parent: parentRef }) {
+function useResize({ container, duration, parentSize }) {
   const [styles, setStyles] = useState({ left: "0px", width: "0px" });
 
   const size = useRef({ width: 0, left: 0, base: 0, leftOffset: 0 });
@@ -146,7 +146,7 @@ function useResize({ container, duration, parent: parentRef }) {
   useEffect(() => {
     if (duration) {
       // Calcular el número mínimo de píxeles por segundo basado en el ancho del elemento contenedor
-      const minPxPerSec = parentRef.clientWidth / duration;
+      const minPxPerSec = parentSize / duration;
 
       // Calcular el tamaño base en función de la duración y el número mínimo de píxeles por segundo
       const baseSize = duration * minPxPerSec;
@@ -166,7 +166,7 @@ function useResize({ container, duration, parent: parentRef }) {
   };
 }
 
-function useFrame({ videos, containerWidth, frameSize = 80 }) {
+function useFrame({ videos, parentSize, frameSize = 80 }) {
   const [frames, setFrames] = useState([]);
 
   const drawFrame = (video, canvas, timeInSeconds) => {
@@ -192,11 +192,11 @@ function useFrame({ videos, containerWidth, frameSize = 80 }) {
     });
   };
 
-  const handleFrames = async ({ videoElement, canvas, containerWidth }) => {
+  const handleFrames = async ({ videoElement, canvas, parentSize }) => {
     const SIZE_SCREENSHOT = frameSize;
     const durationInSeconds = videoElement.duration;
 
-    const minPxPerSec = containerWidth / durationInSeconds;
+    const minPxPerSec = parentSize / durationInSeconds;
     const frameRate = SIZE_SCREENSHOT / minPxPerSec;
 
     const duration = Array.from(
@@ -253,11 +253,12 @@ function useFrame({ videos, containerWidth, frameSize = 80 }) {
     };
 
     const loadedDataHandler = (videoElement, canvas) =>
-      handleFrames({ videoElement, canvas, containerWidth });
+      handleFrames({ videoElement, canvas, parentSize });
+
+    const canvas = createCanvasElement();
 
     const videoGroup = videos.map((video) => {
       const videoElement = createVideoElement(video);
-      const canvas = createCanvasElement();
 
       videoElement.addEventListener("loadeddata", () =>
         loadedDataHandler(videoElement, canvas)
@@ -272,7 +273,7 @@ function useFrame({ videos, containerWidth, frameSize = 80 }) {
         video.removeEventListener("loadeddata", () => loadedDataHandler());
       });
     };
-  }, [videos, containerWidth]);
+  }, [videos, parentSize]);
 
   return { frames };
 }
@@ -327,29 +328,43 @@ function VideoEditor({ videos }) {
 }
 
 function VideoFrames({ videos }) {
-  const containerRef = useRef();
+  const [containerSize, setContainerSize] = useState(0);
+
+  const getContinerRef = useCallback((node) => {
+    if (node) {
+      setContainerSize(node.clientWidth);
+    }
+  }, []);
 
   const { frames } = useFrame({
     videos,
-    containerWidth: 1901,
+    parentSize: containerSize,
   });
-  console.log("🚀 ~ file: VideoJoiner.jsx:165 ~ VideoFrames ~ frames:", frames);
 
+  // style={{ '--width': containerSize + "px" }}
   return (
-    <div className={css["work-area"]}>
-      <div className={css.timeline}></div>
-      <ol className={css.track} ref={containerRef}>
+    <div ref={getContinerRef} className={css["work-area"]}>
+      <div className={css.timeline__wrapper}>
+        <TimeLine
+          parentSize={containerSize * 0.8 * frames.length}
+          duration={frames.reduce((t, frame) => t + frame.duration, 0)}
+        />
+      </div>
+      <ol className={css.track}>
         <li>
           <div
             className={css.track__item}
-            style={{ maxWidth: `${1320 * frames.length}px`, width: "100%" }}
+            style={{
+              maxWidth: `${containerSize * frames.length}px`,
+              width: "100%",
+            }}
           >
             {frames.map(({ id, duration, frames }) => (
               <Drag
                 key={id}
                 id={id}
                 duration={duration}
-                containerRef={containerRef}
+                parentSize={containerSize * 0.8}
               >
                 <Frames frames={frames} />
               </Drag>
@@ -361,7 +376,6 @@ function VideoFrames({ videos }) {
     </div>
   );
 }
-
 function Drag({ children, ...props }) {
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
 
@@ -372,7 +386,6 @@ function Drag({ children, ...props }) {
   );
 
   const handleDragEnd = (e) => {
-    console.log(e);
     const { delta } = e;
     const { x: axisX, y: axisY } = coordinates;
 
@@ -387,14 +400,14 @@ function Drag({ children, ...props }) {
     setCoordinates(newCoordinates);
   };
 
-  const customCollisionDetectionAlgorithm = (e) => {
-    console.log(e);
-  };
+  // const customCollisionDetectionAlgorithm = (e) => {
+  //   // console.log(e);
+  // };
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={customCollisionDetectionAlgorithm}
+      // collisionDetection={customCollisionDetectionAlgorithm}
       modifiers={[restrictToHorizontalAxis]}
       onDragEnd={handleDragEnd}
     >
@@ -405,30 +418,24 @@ function Drag({ children, ...props }) {
   );
 }
 
-const Item = ({ children, id, containerRef, duration, axisX }) => {
+const Item = ({ children, id, parentSize, duration, axisX }) => {
   const { listeners, setNodeRef, transform } = useDraggable({ id });
-
   const refContainer = useRef();
 
-  const {
-    styles: { width, left },
-  } = useResize({
+  const { styles } = useResize({
     container: refContainer.current,
-    parent: containerRef.current,
+    parentSize,
     duration,
   });
 
   const elementStyle = {
     "--translate-x": `${transform?.x ?? 0}px`,
-    "--track-left": `${parseInt(left) + axisX}px`,
-    "--track-width": width,
+    "--track-left": `${parseInt(styles.left) + axisX}px`,
+    "--track-width": styles.width,
   };
 
   return (
-    <div
-      className={` absolute ${css["drag-item"]}`}
-      style={elementStyle}
-    >
+    <div className={` absolute ${css["drag-item"]}`} style={elementStyle}>
       <div ref={setNodeRef}>
         <div
           ref={refContainer}
@@ -450,6 +457,32 @@ const Item = ({ children, id, containerRef, duration, axisX }) => {
     </div>
   );
 };
+
+function TimeLine({ duration, parentSize }) {
+  const LINE_GAP = 80;
+
+  const minPxPerSec = parentSize / duration;
+  const slider = LINE_GAP / minPxPerSec;
+
+  const timeLineNumbers = Array.from(
+    { length: Math.floor(duration * 1.1 / slider) },
+    (_, i) => i * slider
+  );
+
+  const lines = timeLineNumbers.map((_, i) => (
+    <div
+      key={i}
+      className={css.timeline__line}
+      style={{ left: `${LINE_GAP * i}px` }}
+    >
+      <small>{i === 0 ? 0 : converterTime(timeLineNumbers[i])}</small>
+      <div></div>
+    </div>
+  ));
+
+  return <div className={`${css.timeline}`}>{duration ? lines : null}</div>;
+}
+
 function Frames({ frames }) {
   return (
     <div className={css.frame}>
@@ -473,7 +506,7 @@ Drag.propTypes = {
 Item.propTypes = {
   children: PropTypes.any,
   id: PropTypes.string,
-  containerRef: PropTypes.any,
+  parentSize: PropTypes.any,
   duration: PropTypes.number,
   axisX: PropTypes.number,
 };
@@ -488,4 +521,10 @@ VideoFrames.propTypes = {
 
 Frames.propTypes = {
   frames: PropTypes.array,
+};
+
+TimeLine.propTypes = {
+  duration: PropTypes.any,
+  countVideos: PropTypes.any,
+  parentSize: PropTypes.any,
 };

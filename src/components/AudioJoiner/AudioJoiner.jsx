@@ -87,7 +87,8 @@ export function AudioJoiner() {
   };
 
   const toggleAudioPlayback = () => {
-    playerOptions?.TogglePlay();
+    playerOptions.TogglePlay();
+    console.log(playerOptions.isPlaying())
     setPlaybackIconState(!playbackIconState);
   };
 
