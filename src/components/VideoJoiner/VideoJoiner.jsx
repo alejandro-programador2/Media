@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  memo,
+  useLayoutEffect,
+  useMemo,
+} from "react";
 import PropTypes from "prop-types";
 import {
   DndContext,
@@ -9,13 +17,22 @@ import {
   MouseSensor,
   useDraggable,
 } from "@dnd-kit/core";
-import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import {
+  restrictToHorizontalAxis,
+  restrictToParentElement,
+} from "@dnd-kit/modifiers";
 
 import { Shell } from "../Shell";
 import { FileAudio } from "../FileAudio";
+import { FastForwardIcon, FastRewindIcon, PauseIcon, PlayIcon } from "./icons";
 
 import css from "./VideoJoiner.module.css";
 import converterTime from "../../helper/converterTime";
+
+const TIMELINE_PADDING = Object.freeze({
+  INCREASE: 1.1, // 10%
+  DECREASE: 0.8, // It's equal to 80%
+});
 
 function useResize({ container, duration, parentSize }) {
   const [styles, setStyles] = useState({ left: "0px", width: "0px" });
@@ -39,6 +56,18 @@ function useResize({ container, duration, parentSize }) {
       );
     }
   }, [container]);
+
+  const newTimeEvent = () => {
+    const minPxPerSec = size.current.width / duration;
+    // TODO: Is this operation correct?
+    const timeInSeconds = duration * minPxPerSec;
+
+    const event = new CustomEvent("time", {
+      detail: { time: timeInSeconds },
+    });
+
+    return event;
+  };
 
   const onPointerDown = (event) => {
     console.log("Down 👇");
@@ -108,6 +137,8 @@ function useResize({ container, duration, parentSize }) {
           left: `${size.current.left}px`,
           width: `${size.current.width}px`,
         });
+
+        container.dispatchEvent(newTimeEvent());
 
         // Actualizar la posición inicial del puntero para la próxima vez
         startXRef.current = x;
@@ -278,6 +309,141 @@ function useFrame({ videos, parentSize, frameSize = 80 }) {
   return { frames };
 }
 
+function useVideo({ videosId }) {
+  const videosRef = useRef([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const currentVideo = useRef(0);
+
+  const setNewRefVideo = (element) => {
+    const videoElementIndex = videosRef.current.findIndex(
+      (ref) => ref.id === element.id
+    );
+
+    if (videoElementIndex >= 0) return;
+    videosRef.current.push(element);
+  };
+
+  const videoElements = (list) => {
+    list.forEach((id) => {
+      const element = document.querySelector(`video[id="${id}"]`);
+      setNewRefVideo(element);
+    });
+  };
+
+  const onPause = () => {
+    if (isPlaying) {
+      videosRef.current[currentVideo.current].pause();
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const onPlay = () => {
+    videosRef.current[currentVideo.current].play();
+    setIsPlaying(!isPlaying);
+  };
+
+  const onSeek = (seconds) => {
+    videosRef.current[currentVideo.current].currentTime += seconds;
+  };
+
+  // const getTracksIntoTimeline = (list) => {
+  //   const trackElementPosition = list.map((id) => {
+  //     const trackElement = document.querySelector(`div[data-element="drag"][id="${id}"]`);
+  //     const { x } = trackElement.getBoundingClientRect()
+  //     return { id, positionX: x}
+  //   });
+
+  // }
+  // useEffect(() => {
+  //   if (isPlaying) {
+  //     ref.addEventListener("timeupdate", getCurrentTime);
+  //   }
+
+  //   return () => {
+  //     ref?.removeEventListener("timeupdate", getCurrentTime);
+  //   };
+  // }, [isPlaying]);
+
+  useLayoutEffect(() => {
+    if (videosId.length > 0) {
+      videoElements(videosId);
+    }
+  }, [videosId]);
+
+  return {
+    isPlaying,
+    onPause,
+    onPlay,
+    onSeek,
+  };
+}
+
+const useTrack = ({ videosID, parentSize, duration }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const videosRef = useRef([]);
+  const currentVideo = useRef(0);
+  const currentTime = useRef(0);
+  const intervalID = useRef(null);
+
+  const setNewRefVideo = (element) => {
+    const videoElementIndex = videosRef.current.findIndex(
+      (ref) => ref.id === element.id
+    );
+
+    if (videoElementIndex >= 0) return;
+    videosRef.current.push(element);
+  };
+
+  const updatedTimeEvent = () => {
+    const event = new Event("updatedTime");
+    const minPxPerSec =  duration / parentSize;
+
+    intervalID.current = setInterval(() => {
+
+      // TODO: What value do I have to return?
+      currentTime.current += 1;
+      event.currentTime = currentTime.current;
+      document.dispatchEvent(event);
+
+      if (currentTime.current === duration) {
+        clearInterval(intervalID.current);
+      }
+    }, 1000);
+  };
+
+  const onPlay = () => {
+    updatedTimeEvent();
+    setIsPlaying(!isPlaying);
+  };
+
+  const onPause = () => {
+    if (isPlaying) {
+      clearInterval(intervalID.current);
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const videoElements = (list) => {
+    list.forEach((id) => {
+      const element = document.querySelector(`video[id="${id}"]`);
+      setNewRefVideo(element);
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (videosID.length > 0) {
+      videoElements(videosID);
+    }
+  }, [videosID]);
+
+  return {
+    isPlaying,
+    onPlay,
+    onPause,
+  };
+};
+
 export const VideoJoiner = () => {
   const [files, setFiles] = useState([]);
 
@@ -298,36 +464,56 @@ export const VideoJoiner = () => {
 };
 
 function VideoEditor({ videos }) {
+  // const [activeVideo, setActiveVideo] = useState(0);
+
+  // useEffect(() => {
+  //   if (!refVideo) return;
+
+  //   const nextVideo = ({ target }) => {
+  //     const currentVideo = target;
+  //     const videoElement = document.querySelector(
+  //       `video[data-component="video"]:not(video[id="${currentVideo.id}"])`
+  //     );
+
+  //     currentVideo.classList.add(css["video__base--hidden"]);
+  //     videoElement.classList.remove(css["video__base--hidden"]);
+
+  //     setActiveVideo(parseInt(videoElement.dataset.index));
+  //   };
+
+  //   refVideo.addEventListener("ended", nextVideo);
+
+  //   return () => {
+  //     refVideo.removeEventListener("Ended", nextVideo);
+  //   };
+  // }, [isPlaying]);
+
   return (
     <div className={css.container}>
       <section className={css.video}>
-        {videos.map((video, index) => (
-          <div
-            key={video.id}
-            className={`${css.video__base} ${
-              index >= 1 && css["video__base--hidden"]
-            }`}
-          >
+        <div className={`${css.video__base}`}>
+          {videos.map((video, index) => (
             <video
+              key={video.id}
+              id={video.id}
               src={video.url}
               preload="metadata"
-              crossOrigin="anonymous"
               controls
-              className={css.video__element}
+              crossOrigin="anonymous"
+              className={`${css.video__element} ${
+                index >= 1 && css["video__base--hidden"]
+              }`}
             />
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
 
-      <section className={css["info-panel"]}>
-        <div className={css["toolbar"]}>▶</div>
-        <VideoFrames videos={videos} />
-      </section>
+      <EditPanel videos={videos} />
     </div>
   );
 }
 
-function VideoFrames({ videos }) {
+const EditPanel = memo(({ videos }) => {
   const [containerSize, setContainerSize] = useState(0);
 
   const getContinerRef = useCallback((node) => {
@@ -336,46 +522,128 @@ function VideoFrames({ videos }) {
     }
   }, []);
 
+  const duration = useMemo(
+    () => videos.reduce((time, video) => time + video.duration, 0),
+    [videos]
+  );
+
+  const videosID = useMemo(() => videos.map((video) => video.id), [videos]);
+
+  const timeLineSize = useMemo(
+    () => containerSize * TIMELINE_PADDING.DECREASE * videos.length,
+    [containerSize, videos]
+  );
+
+  const { isPlaying, onPlay, onPause } = useTrack({
+    videosID,
+    parentSize: containerSize,
+    duration,
+  });
+
+  const onTogglePlay = () => (isPlaying ? onPause() : onPlay());
+
+  return (
+    <section className={css["edit-panel"]}>
+      <div className={css["toolbar"]}>
+        <p>{converterTime(duration)}</p>
+        {/* <button onClick={() => onSeek(-10)}>
+            <FastRewindIcon />
+          </button> */}
+
+        <button onClick={onTogglePlay}>
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
+        </button>
+
+        {/* <button onClick={() => onSeek(10)}>
+            <FastForwardIcon />
+          </button> */}
+        <p>{converterTime(0)}</p>
+      </div>
+
+      <div ref={getContinerRef} className={css["work-area"]}>
+        <Tracker parentSize={containerSize} duration={duration} />
+
+        <div className={css.timeline__wrapper}>
+          <TimeLine parentSize={timeLineSize} duration={duration} />
+        </div>
+
+        <Tracks videos={videos} containerSize={containerSize} />
+      </div>
+    </section>
+  );
+});
+
+const Tracks = ({ videos, containerSize }) => {
   const { frames } = useFrame({
     videos,
     parentSize: containerSize,
   });
 
-  // style={{ '--width': containerSize + "px" }}
   return (
-    <div ref={getContinerRef} className={css["work-area"]}>
-      <div className={css.timeline__wrapper}>
-        <TimeLine
-          parentSize={containerSize * 0.8 * frames.length}
-          duration={frames.reduce((t, frame) => t + frame.duration, 0)}
-        />
-      </div>
-      <ol className={css.track}>
-        <li>
-          <div
-            className={css.track__item}
-            style={{
-              maxWidth: `${containerSize * frames.length}px`,
-              width: "100%",
-            }}
-          >
-            {frames.map(({ id, duration, frames }) => (
-              <Drag
-                key={id}
-                id={id}
-                duration={duration}
-                parentSize={containerSize * 0.8}
-              >
-                <Frames frames={frames} />
-              </Drag>
-            ))}
-          </div>
-        </li>
-        <li>2</li>
-      </ol>
+    <ol className={css.track}>
+      <li>
+        <div
+          className={css.track__item}
+          style={{
+            maxWidth: `${containerSize * frames.length}px`,
+            width: "100%",
+          }}
+        >
+          {frames.map(({ id, duration, frames }) => (
+            <Drag
+              key={id}
+              id={id}
+              duration={duration}
+              parentSize={containerSize * 0.8}
+            >
+              <Frames frames={frames} />
+            </Drag>
+          ))}
+        </div>
+      </li>
+      <li>2</li>
+    </ol>
+  );
+};
+
+function Tracker({ parentSize, duration }) {
+  const [axisX, setAxisX] = useState(40);
+
+  useEffect(() => {
+    if (!parentSize) return;
+
+    const updateTime = ({ currentTime }) => {
+      setAxisX(currentTime);
+
+      
+      // setAxisX(
+      //   Math.floor(
+      //     (currentTime / duration) * parentSize
+      //   )
+      // );
+    };
+
+    // Agregar el event listener al evento timeupdate
+    document.addEventListener("updatedTime", updateTime);
+
+    return () => {
+      document.removeEventListener("timeupdate", updateTime);
+    };
+  }, [parentSize]);
+
+  return (
+    <div
+      className={css.tracker}
+      style={{
+        left: `${axisX}px`,
+      }}
+    >
+      <div className={css["tracker__header-square"]}></div>
+      <div className={css["tracker__header-triangle"]}></div>
     </div>
   );
 }
+
 function Drag({ children, ...props }) {
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
 
@@ -389,26 +657,18 @@ function Drag({ children, ...props }) {
     const { delta } = e;
     const { x: axisX, y: axisY } = coordinates;
 
-    // const dragElements = document.querySelectorAll('div[data-element="drag"]')
-
     const newCoordinates = {
       x: axisX + delta.x,
       y: axisY + delta.y,
     };
 
-    // setCoordinates(({ x, y }) => ({ x: x + delta.x, y: y + delta.y }));
     setCoordinates(newCoordinates);
   };
-
-  // const customCollisionDetectionAlgorithm = (e) => {
-  //   // console.log(e);
-  // };
 
   return (
     <DndContext
       sensors={sensors}
-      // collisionDetection={customCollisionDetectionAlgorithm}
-      modifiers={[restrictToHorizontalAxis]}
+      modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
       onDragEnd={handleDragEnd}
     >
       <Drag.Item axisX={coordinates.x} {...props}>
@@ -435,24 +695,27 @@ const Item = ({ children, id, parentSize, duration, axisX }) => {
   };
 
   return (
-    <div className={` absolute ${css["drag-item"]}`} style={elementStyle}>
-      <div ref={setNodeRef}>
-        <div
-          ref={refContainer}
-          className={` ${css["drag-item__track"]}`}
-          data-element="drag"
-          {...listeners}
-        >
-          {children}
-          <span
-            data-resize-side="left"
-            className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--left"]}`}
-          ></span>
-          <span
-            data-resize-side="right"
-            className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--right"]}`}
-          ></span>
-        </div>
+    <div
+      ref={setNodeRef}
+      id={id}
+      className={`${css["drag-item"]}`}
+      style={elementStyle}
+      data-element="drag"
+    >
+      <div
+        ref={refContainer}
+        className={` ${css["drag-item__track"]}`}
+        {...listeners}
+      >
+        {children}
+        <span
+          data-resize-side="left"
+          className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--left"]}`}
+        ></span>
+        <span
+          data-resize-side="right"
+          className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--right"]}`}
+        ></span>
       </div>
     </div>
   );
@@ -465,7 +728,7 @@ function TimeLine({ duration, parentSize }) {
   const slider = LINE_GAP / minPxPerSec;
 
   const timeLineNumbers = Array.from(
-    { length: Math.floor(duration * 1.1 / slider) },
+    { length: Math.floor((duration * TIMELINE_PADDING.INCREASE) / slider) },
     (_, i) => i * slider
   );
 
@@ -515,8 +778,18 @@ VideoEditor.propTypes = {
   videos: PropTypes.array,
 };
 
-VideoFrames.propTypes = {
+EditPanel.propTypes = {
   videos: PropTypes.array,
+};
+
+Tracker.propTypes = {
+  parentSize: PropTypes.number,
+  duration: PropTypes.number,
+};
+
+Tracks.propTypes = {
+  videos: PropTypes.array,
+  containerSize: PropTypes.number,
 };
 
 Frames.propTypes = {

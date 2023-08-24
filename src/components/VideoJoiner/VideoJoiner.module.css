@@ -8,6 +8,7 @@ header div>a {
 
 .container {
     --work-area-size: 300px;
+    --main-color: #fded70;
 
     display: grid;
     height: calc(100svh - var(--header, 0));
@@ -36,12 +37,15 @@ header div>a {
     width: clamp(500px, 50vw, 900px);
     display: grid;
     place-content: center;
-    align-items: center;
+    grid-template-areas: "stack";
 }
 
+.video__base>* {
+    grid-area: stack;
+}
 
 .video__base--hidden {
-    display: none;
+    visibility: hidden;
 }
 
 .video__element {
@@ -52,22 +56,49 @@ header div>a {
     background-color: #000000;
 }
 
-.info-panel {
+.edit-panel {
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
 
 .toolbar {
+    padding-block: clamp(0.5rem, 5%, 0.7rem);
     display: flex;
     justify-content: center;
-    padding-block: clamp(0.5rem, 5%, 0.7rem);
-    /* border: 1px solid #fded70; */
+    align-items: center;
+    gap: clamp(0.8rem, 5%, 3rem);
+    font-size: clamp(0.8rem, 0.17vw + 0.76rem, 0.89rem);
+    color: #B4C3D3;
     background-color: #18181A;
+}
+
+.toolbar button {
+    --size: 2.3rem;
+
+    display: flex;
+    justify-content: center;
+    width: var(--size);
+    border-radius: 0.3125rem;
+    padding-inline: 0.3rem;
+}
+
+.toolbar button:hover {
+    background-color: #212123;
+    transition: background-color 500ms ease;
+}
+
+.toolbar button svg {
+    display: block;
+    width: var(--size);
+    height: var(--size);
+    pointer-events: none;
+    fill: currentColor;
 }
 
 .work-area {
     /* height: 100%; */
+    position: relative;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -95,11 +126,43 @@ header div>a {
     background-color: transparent;
 }
 
+.tracker {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background-color: var(--main-color);
+    z-index: 40;
+    cursor: ew-resize;
+}
+
+
+.tracker__header-square, 
+.tracker__header-triangle
+{
+    position: absolute;
+    left: 50%;
+    border-radius: 0.125rem;
+    background-color: var(--main-color);
+}
+
+.tracker__header-square {
+    width: 12px;
+    height: 12px;
+    top: 0;
+    transform: translateX(-50%);
+}
+
+.tracker__header-triangle {
+    width: 9px;
+    height: 9px;
+    top: 6px;
+    transform: translateX(-50%) rotate(45deg);
+}
+
 
 .timeline__wrapper {
     --color-border: rgba(180, 195, 211, .1);
-
-    /* border-bottom: 1px solid rgba(180,195,211,.1); */
 
     position: relative;
     cursor: pointer;
@@ -109,35 +172,29 @@ header div>a {
     background-position: 0 100%;
     background-size: 100% 1px;
     background-repeat: no-repeat;
-
     margin-block-end: 0.8rem;
 }
 
 .track {
     height: 100%;
     position: relative;
-    /* border: 1px solid red; */
 }
 
 .track>li {
-    height: 100%;
     position: relative;
 }
 
 .track__item {
-    display: inline-block;
-    position: relative;
-    margin-block-end: .625rem;
-
     --height: 3.5rem;
 
     position: relative;
+    display: inline-block;
+    position: relative;
+    margin-block-end: .625rem;
     height: var(--height);
     width: 200%;
     transition: height 33ms linear;
     border-radius: .3125rem;
-
-    /* border: 2px solid darkmagenta; */
     background-color: #1A1C20;
 }
 
@@ -150,7 +207,7 @@ header div>a {
 .drag-item {
     --track-width: 0px;
     --track-left: 0px;
-
+    position: absolute;
     left: var(--track-left, 0);
     width: var(--track-width, 0);
     height: var(--height);
@@ -170,6 +227,7 @@ header div>a {
     cursor: default;
     pointer-events: all;
     backface-visibility: hidden;
+
     transform: translate3d(var(--translate-x), 0, 0) scale(1);
 }
 
@@ -186,7 +244,7 @@ header div>a {
 
     content: "";
     position: absolute;
-    background-color: #fded70;
+    background-color: var(--main-color);
     width: var(--size);
     top: 0;
     bottom: 0;
