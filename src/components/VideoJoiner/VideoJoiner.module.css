@@ -195,7 +195,7 @@ header div>a {
     width: 200%;
     transition: height 33ms linear;
     border-radius: .3125rem;
-    background-color: #1A1C20;
+    background-color: red;
 }
 
 .frame {

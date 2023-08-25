@@ -6,8 +6,6 @@ import {
   memo,
   useLayoutEffect,
   useMemo,
-  createContext,
-  useContext,
 } from "react";
 import PropTypes from "prop-types";
 import {
@@ -31,13 +29,16 @@ import { FastForwardIcon, FastRewindIcon, PauseIcon, PlayIcon } from "./icons";
 import css from "./VideoJoiner.module.css";
 import converterTime from "../../helper/converterTime";
 
-import { LINE_GAP, TIMELINE_PADDING, EVENTS } from "./const";
+const TIMELINE_PADDING = Object.freeze({
+  INCREASE: 1.1, // 10%
+  DECREASE: 0.8, // It's equal to 80%
+});
 
-const EditPanelContext = createContext();
-
-const useEditPanel = () => {
-  return useContext(EditPanelContext);
-};
+const EVENTS = Object.freeze({
+  TRACKLEFT: "TrackLeftChange",
+  TIMECHANGE: "TimeChangeEvent",
+  TRACKTIME: "TrackTimeUpdate",
+});
 
 function useResize({ id, container, duration, parentSize }) {
   const [styles, setStyles] = useState({ left: "0px", width: "0px" });
@@ -316,7 +317,7 @@ function useFrame({ videos, parentSize, frameSize = 80 }) {
   return { frames };
 }
 
-const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
+const useTrack = ({ videosID, parentSize, duration }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const videosRef = useRef([]);
@@ -336,27 +337,34 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
   const updatedTimeEvent = () => {
     const event = new Event("updatedTime");
 
-    const durationIncrease = duration * TIMELINE_PADDING.INCREASE;
+    const durationIncrease = duration * TIMELINE_PADDING.INCREASE
+
     const minPxPerSec = parentSize / durationIncrease;
 
-    const slider = lineGap / minPxPerSec;
+    const SIZE_GAP = 80;
+    const slider = SIZE_GAP / minPxPerSec;
+
     const TEST = durationIncrease / slider;
 
-    const ARRAY_TIME = 1 * slider;
-    const SECONDS = 1000
+    const ARRAY_TIME = Array.from(
+      { length: Math.floor(durationIncrease / slider) },
+      (_, i) => i * slider
+    )[1];
 
-    const velocidadDesplazamiento = ARRAY_TIME / minPxPerSec;
+    console.log("🚀", TEST, ARRAY_TIME);
+
+    const velocidadDesplazamiento = ARRAY_TIME / minPxPerSec / 1000;
 
     intervalID.current = setInterval(() => {
       // TODO: What value do I have to return?
-      currentTime.current += TEST / SECONDS;
+      currentTime.current += TEST / 1000;
       event.currentTime = currentTime.current;
       document.dispatchEvent(event);
 
       if (currentTime.current === duration) {
         clearInterval(intervalID.current);
       }
-    }, velocidadDesplazamiento / SECONDS);
+    }, velocidadDesplazamiento);
   };
 
   const onPlay = () => {
@@ -530,115 +538,42 @@ const EditPanel = memo(({ videos }) => {
     videosID,
     parentSize: timeLineSize,
     duration,
-    lineGap: LINE_GAP,
   });
 
   const onTogglePlay = () => (isPlaying ? onPause() : onPlay());
 
   return (
-    <EditPanelContext.Provider
-      value={{
-        duration,
-        containerSize,
-        timeLineSize,
-        lineGap: LINE_GAP,
-      }}
-    >
-      <section className={css["edit-panel"]}>
-        <div className={css["toolbar"]}>
-          <p>{converterTime(duration)}</p>
-          {/* <button onClick={() => onSeek(-10)}>
+    <section className={css["edit-panel"]}>
+      <div className={css["toolbar"]}>
+        <p>{converterTime(duration)}</p>
+        {/* <button onClick={() => onSeek(-10)}>
             <FastRewindIcon />
           </button> */}
 
-          <button onClick={onTogglePlay}>
-            {isPlaying ? <PauseIcon /> : <PlayIcon />}
-          </button>
+        <button onClick={onTogglePlay}>
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
+        </button>
 
-          {/* <button onClick={() => onSeek(10)}>
+        {/* <button onClick={() => onSeek(10)}>
             <FastForwardIcon />
           </button> */}
-          <p>{converterTime(0)}</p>
+        <p>{converterTime(0)}</p>
+      </div>
+
+      <div ref={getContinerRef} className={css["work-area"]}>
+        <Tracker parentSize={timeLineSize} duration={duration} />
+
+        <div className={css.timeline__wrapper}>
+          <TimeLine parentSize={timeLineSize} duration={duration} />
         </div>
 
-        <div ref={getContinerRef} className={css["work-area"]}>
-          <Tracker/>
-
-          <div className={css.timeline__wrapper}>
-            <TimeLine />
-          </div>
-
-          <Tracks videos={videos} />
-        </div>
-      </section>
-    </EditPanelContext.Provider>
+        <Tracks videos={videos} containerSize={containerSize} />
+      </div>
+    </section>
   );
 });
 
-function Tracker() {
-  const { duration, timeLineSize } = useEditPanel();
-  const [axisX, setAxisX] = useState(0);
-
-  useEffect(() => {
-    if (!timeLineSize) return;
-
-    const updateTime = ({ currentTime }) => {
-      console.log(
-        "🚀 ~ file: VideoJoiner.jsx:611 ~ updateTime ~ currentTime:",
-        currentTime
-      );
-
-      setAxisX(Math.floor((currentTime / duration) * timeLineSize));
-    };
-
-    document.addEventListener("updatedTime", updateTime);
-
-    return () => {
-      document.removeEventListener("timeupdate", updateTime);
-    };
-  }, [timeLineSize]);
-
-  return (
-    <div
-      className={css.tracker}
-      style={{
-        left: `${axisX}px`,
-      }}
-    >
-      <div className={css["tracker__header-square"]}></div>
-      <div className={css["tracker__header-triangle"]}></div>
-    </div>
-  );
-}
-
-function TimeLine() {
-  const { duration, timeLineSize, lineGap } = useEditPanel();
-  const modifiedDuration = duration * TIMELINE_PADDING.INCREASE;
-
-  const minPxPerSec = timeLineSize / modifiedDuration;
-  const slider = lineGap / minPxPerSec;
-
-  const timeLineNumbers = Array.from(
-    { length: Math.floor(modifiedDuration / slider) },
-    (_, i) => i * slider
-  );
-
-  const lines = timeLineNumbers.map((_, i) => (
-    <div
-      key={i}
-      className={css.timeline__line}
-      style={{ left: `${LINE_GAP * i}px` }}
-    >
-      <small>{i === 0 ? 0 : converterTime(timeLineNumbers[i])}</small>
-      <div></div>
-    </div>
-  ));
-
-  return <div className={`${css.timeline}`}>{duration ? lines : null}</div>;
-}
-
-const Tracks = ({ videos }) => {
-  const { containerSize } = useEditPanel();
+const Tracks = ({ videos, containerSize }) => {
   const { frames } = useFrame({
     videos,
     parentSize: containerSize,
@@ -670,6 +605,42 @@ const Tracks = ({ videos }) => {
     </ol>
   );
 };
+
+function Tracker({ parentSize, duration }) {
+  const [axisX, setAxisX] = useState(0);
+
+  useEffect(() => {
+    if (!parentSize) return;
+
+    const updateTime = ({ currentTime }) => {
+      console.log(
+        "🚀 ~ file: VideoJoiner.jsx:611 ~ updateTime ~ currentTime:",
+        currentTime
+      );
+
+      setAxisX(Math.floor((currentTime / duration) * parentSize));
+    };
+
+    // Agregar el event listener al evento timeupdate
+    document.addEventListener("updatedTime", updateTime);
+
+    return () => {
+      document.removeEventListener("timeupdate", updateTime);
+    };
+  }, [parentSize]);
+
+  return (
+    <div
+      className={css.tracker}
+      style={{
+        left: `${axisX}px`,
+      }}
+    >
+      <div className={css["tracker__header-square"]}></div>
+      <div className={css["tracker__header-triangle"]}></div>
+    </div>
+  );
+}
 
 function Drag({ children, ...props }) {
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
@@ -758,6 +729,38 @@ const Item = ({ children, id, parentSize, duration, axisX }) => {
     </div>
   );
 };
+
+function TimeLine({ duration: d, parentSize }) {
+  // const minPxPerSec = containerRef.current.clientWidth / durationInSeconds;
+  // const frameRate = 80 / minPxPerSec;
+  const duration = d * TIMELINE_PADDING.INCREASE
+
+  const LINE_GAP = 80;
+
+  // TODO:
+  const minPxPerSec = parentSize / duration;
+  const slider = LINE_GAP / minPxPerSec;
+
+  // console.log("🚀 ~ file: VideoJoiner.jsx:732 ~ TimeLine ~ test:", test)
+
+  const timeLineNumbers = Array.from(
+    { length: Math.floor(duration / slider) },
+    (_, i) => i * slider
+  );
+
+  const lines = timeLineNumbers.map((_, i) => (
+    <div
+      key={i}
+      className={css.timeline__line}
+      style={{ left: `${LINE_GAP * i}px` }}
+    >
+      <small>{i === 0 ? 0 : converterTime(timeLineNumbers[i])}</small>
+      <div></div>
+    </div>
+  ));
+
+  return <div className={`${css.timeline}`}>{duration ? lines : null}</div>;
+}
 
 function Frames({ frames }) {
   return (
