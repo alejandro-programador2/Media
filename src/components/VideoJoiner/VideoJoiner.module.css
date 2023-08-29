@@ -106,7 +106,7 @@ header div>a {
     flex: 1;
     overflow-x: scroll;
     overflow-y: hidden;
-    padding-inline: .625rem;
+    margin-inline: .625rem;
 }
 
 .work-area::-webkit-scrollbar {

@@ -63,9 +63,8 @@ function useResize({ id, container, duration, parentSize }) {
   }, [container]);
 
   const newTimeEvent = () => {
-    const minPxPerSec = size.current.width / duration;
-    // TODO: Is this operation correct?
-    const timeInSeconds = duration * minPxPerSec;
+    const minPxPerSec = parentSize / duration;
+    const timeInSeconds = size.current.width / minPxPerSec;
 
     const event = new CustomEvent("time", {
       detail: { id, time: timeInSeconds },
@@ -319,48 +318,110 @@ function useFrame({ videos, parentSize, frameSize = 80 }) {
 const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const videosRef = useRef([]);
-  const currentVideo = useRef(0);
+  const videoElementsRef = useRef([]);
+  const currentVideoID = useRef(null);
   const currentTime = useRef(0);
   const intervalID = useRef(null);
 
   const setNewRefVideo = (video) => {
-    const videoElementIndex = videosRef.current.findIndex(
+    const videoElementIndex = videoElementsRef.current.findIndex(
       (ref) => ref.id === video.id
     );
 
     if (videoElementIndex >= 0) return;
-    videosRef.current.push(video);
+    videoElementsRef.current.push(video);
   };
 
-  const updatedTimeEvent = () => {
-    const event = new Event("updatedTime");
+  const getCurrentVideo = () => {
+    const currentVideo = videoElementsRef.current.find(
+      ({ timestart, duration }) =>
+        currentTime.current >= timestart &&
+        currentTime.current < timestart + duration
+    );
 
-    const durationIncrease = duration * TIMELINE_PADDING.INCREASE;
-    const minPxPerSec = parentSize / durationIncrease;
+    return currentVideo;
+  };
 
-    const slider = lineGap / minPxPerSec;
-    const TEST = durationIncrease / slider;
+  const handleCurrentVideo = () => {
+    const video = getCurrentVideo();
+    // console.log(currentTime.current);
+    if (!video) {
+      if (currentVideoID.current !== null) {
+        currentVideoID.current = null;
+      }
+      return;
+    }
 
-    const ARRAY_TIME = 1 * slider;
-    const SECONDS = 1000
+    // console.log(video?.id, currentVideo.current)
+    const { id, videoElement } = video;
 
-    const velocidadDesplazamiento = ARRAY_TIME / minPxPerSec;
+    if (currentVideoID.current !== null && currentVideoID.current !== id) {
+      const { videoElement } = videoElementsRef.current.find(
+        ({ id }) => id === currentVideoID.current
+      );
 
+      videoElement.classList.add(css["video__base--hidden"]);
+      videoElement.pause();
+    }
+
+    if (videoElement.classList.contains(css["video__base--hidden"])) {
+      videoElement.classList.remove(css["video__base--hidden"]);
+    }
+
+    if (videoElement.paused) {
+      videoElement.play();
+    }
+
+    currentVideoID.current = id;
+  };
+
+  const updateTimeEvent = () => {
+    // Crear un evento personalizado para indicar la actualización de tiempo en el track de video
+    const timeUpdatedEvent = new Event("timeUpdated");
+
+    // Calcular píxeles por segundo en el timeline del editor de video
+    const pixelsPerSecond = parentSize / duration;
+
+    // Calcular el tiempo que representa una unidad de track en el timeline
+    const timePerTrackUnit = duration / (parentSize / lineGap);
+
+    // Calcular el incremento de tiempo por unidad de track en el timeline,
+    // ajustado para lograr un incremento más gradual en currentTime
+    const timeIncrementPerTrackUnit =
+      timePerTrackUnit / pixelsPerSecond / lineGap;
+
+    // Constante para convertir milisegundos a segundos
+    const MILLISECONDS_PER_SECOND = 1000;
+
+    // Calcular el intervalo de tiempo entre actualizaciones del track,
+    // basado en el incremento de tiempo por unidad de track
+    const trackScrollSpeed =
+      timeIncrementPerTrackUnit * MILLISECONDS_PER_SECOND;
+
+    // Configurar un intervalo para actualizar el tiempo en el track del timeline
     intervalID.current = setInterval(() => {
-      // TODO: What value do I have to return?
-      currentTime.current += TEST / SECONDS;
-      event.currentTime = currentTime.current;
-      document.dispatchEvent(event);
+      // Aumentar el tiempo actual según el incremento de tiempo por unidad de track
+      currentTime.current += timeIncrementPerTrackUnit;
 
-      if (currentTime.current === duration) {
+      // Verificar si se ha alcanzado o superado la duración total del video
+      if (currentTime.current >= duration) {
         clearInterval(intervalID.current);
       }
-    }, velocidadDesplazamiento / SECONDS);
+
+      // Actualizar el valor de tiempo en el evento
+      timeUpdatedEvent.currentTime = currentTime.current;
+      // Emitir el evento de tiempo actualizado
+      document.dispatchEvent(timeUpdatedEvent);
+
+      // Realizar acciones relacionadas con el video
+      handleCurrentVideo();
+      // Mostrar el tiempo actual en la consola
+      console.log(currentTime.current);
+    }, trackScrollSpeed);
   };
 
   const onPlay = () => {
-    updatedTimeEvent();
+    updateTimeEvent();
     setIsPlaying(!isPlaying);
   };
 
@@ -368,13 +429,21 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
     if (isPlaying) {
       clearInterval(intervalID.current);
       setIsPlaying(!isPlaying);
+
+      if (currentVideoID.current === null) return;
+
+      const { videoElement } = videoElementsRef.current.find(
+        ({ id }) => id === currentVideoID.current
+      );
+
+      videoElement.pause();
     }
   };
 
   const videoElements = (list) => {
     list.forEach((id) => {
       const video = document.querySelector(`video[id="${id}"]`);
-      setNewRefVideo({ id, element: video, timestart: 0, duration: 0 });
+      setNewRefVideo({ id, videoElement: video, timestart: 0, duration: 0 });
     });
   };
 
@@ -388,13 +457,13 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
     const updatedTime = ({ detail }) => {
       const { id, time } = detail;
 
-      const videoIndex = videosRef.current.findIndex(
+      const videoIndex = videoElementsRef.current.findIndex(
         (video) => video.id === id
       );
 
       if (videoIndex !== -1) {
-        videosRef.current[videoIndex] = {
-          ...videosRef.current[videoIndex],
+        videoElementsRef.current[videoIndex] = {
+          ...videoElementsRef.current[videoIndex],
           duration: time,
         };
       }
@@ -408,13 +477,13 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
 
       const timeInSeconds = axisX / pixelsPerSecond;
 
-      const videoIndex = videosRef.current.findIndex(
+      const videoIndex = videoElementsRef.current.findIndex(
         (video) => video.id === id
       );
 
       if (videoIndex !== -1) {
-        videosRef.current[videoIndex] = {
-          ...videosRef.current[videoIndex],
+        videoElementsRef.current[videoIndex] = {
+          ...videoElementsRef.current[videoIndex],
           timestart: timeInSeconds,
         };
       }
@@ -514,15 +583,19 @@ const EditPanel = memo(({ videos }) => {
     }
   }, []);
 
+  const getTotalDuration = (videos) => {
+    return videos.reduce((time, video) => time + video.duration, 0);
+  };
+
   const duration = useMemo(
-    () => videos.reduce((time, video) => time + video.duration, 0),
+    () => getTotalDuration(videos) * TIMELINE_PADDING.INCREASE,
     [videos]
   );
 
   const videosID = useMemo(() => videos.map((video) => video.id), [videos]);
 
   const timeLineSize = useMemo(
-    () => containerSize * TIMELINE_PADDING.DECREASE * videos.length,
+    () => containerSize * videos.length,
     [containerSize, videos]
   );
 
@@ -548,21 +621,21 @@ const EditPanel = memo(({ videos }) => {
         <div className={css["toolbar"]}>
           <p>{converterTime(duration)}</p>
           {/* <button onClick={() => onSeek(-10)}>
-            <FastRewindIcon />
-          </button> */}
+              <FastRewindIcon />
+            </button> */}
 
           <button onClick={onTogglePlay}>
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </button>
 
           {/* <button onClick={() => onSeek(10)}>
-            <FastForwardIcon />
-          </button> */}
+              <FastForwardIcon />
+            </button> */}
           <p>{converterTime(0)}</p>
         </div>
 
         <div ref={getContinerRef} className={css["work-area"]}>
-          <Tracker/>
+          <Tracker />
 
           <div className={css.timeline__wrapper}>
             <TimeLine />
@@ -580,21 +653,14 @@ function Tracker() {
   const [axisX, setAxisX] = useState(0);
 
   useEffect(() => {
-    if (!timeLineSize) return;
-
     const updateTime = ({ currentTime }) => {
-      console.log(
-        "🚀 ~ file: VideoJoiner.jsx:611 ~ updateTime ~ currentTime:",
-        currentTime
-      );
-
       setAxisX(Math.floor((currentTime / duration) * timeLineSize));
     };
 
-    document.addEventListener("updatedTime", updateTime);
+    document.addEventListener("timeUpdated", updateTime);
 
     return () => {
-      document.removeEventListener("timeupdate", updateTime);
+      document.removeEventListener("timeUpdated", updateTime);
     };
   }, [timeLineSize]);
 
@@ -613,13 +679,12 @@ function Tracker() {
 
 function TimeLine() {
   const { duration, timeLineSize, lineGap } = useEditPanel();
-  const modifiedDuration = duration * TIMELINE_PADDING.INCREASE;
 
-  const minPxPerSec = timeLineSize / modifiedDuration;
+  const minPxPerSec = timeLineSize / duration;
   const slider = lineGap / minPxPerSec;
 
   const timeLineNumbers = Array.from(
-    { length: Math.floor(modifiedDuration / slider) },
+    { length: Math.ceil(duration / slider) },
     (_, i) => i * slider
   );
 
@@ -659,7 +724,7 @@ const Tracks = ({ videos }) => {
               key={id}
               id={id}
               duration={duration}
-              parentSize={containerSize * 0.8}
+              parentSize={containerSize * TIMELINE_PADDING.DECREASE}
             >
               <Frames frames={frames} />
             </Drag>
