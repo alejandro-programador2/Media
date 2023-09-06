@@ -73,7 +73,12 @@ header div>a {
     background-color: #18181A;
 }
 
-.toolbar button {
+.toolbar button:hover {
+    background-color: #212123;
+    transition: background-color 500ms ease;
+}
+
+.toolbar__play-button {
     --size: 2.3rem;
 
     display: flex;
@@ -83,12 +88,7 @@ header div>a {
     padding-inline: 0.3rem;
 }
 
-.toolbar button:hover {
-    background-color: #212123;
-    transition: background-color 500ms ease;
-}
-
-.toolbar button svg {
+.toolbar__play-button svg {
     display: block;
     width: var(--size);
     height: var(--size);
@@ -96,13 +96,33 @@ header div>a {
     fill: currentColor;
 }
 
+.toolbar__download-button {
+    --color: #75F98D;
+
+    position: absolute;
+    right: 2rem;
+    color: var(--color);
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    border-radius: 0.3125rem;
+    padding: clamp(0.2rem, 5%, 0.3rem) clamp(0.5rem, 5%, 0.7rem);
+}
+
+
+.toolbar__download-button svg {
+    display: block;
+    fill: currentColor;
+}
+
+
 .work-area {
-    /* height: 100%; */
+    --width-container: 0px;
+
     position: relative;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* border: 1px solid blanchedalmond; */
     flex: 1;
     overflow-x: scroll;
     overflow-y: hidden;
@@ -166,11 +186,10 @@ header div>a {
 
     position: relative;
     cursor: pointer;
-    width: var(--width);
     height: 42px;
     background-image: linear-gradient(90deg, var(--color-border), var(--color-border));
     background-position: 0 100%;
-    background-size: 100% 1px;
+    background-size: var(--width-container) 1px;
     background-repeat: no-repeat;
     margin-block-end: 0.8rem;
 }
@@ -187,12 +206,11 @@ header div>a {
 .track__item {
     --height: 3.5rem;
 
-    position: relative;
+    position: absolute;
     display: inline-block;
-    position: relative;
     margin-block-end: .625rem;
     height: var(--height);
-    width: 200%;
+    width: var(--width-container);
     transition: height 33ms linear;
     border-radius: .3125rem;
     background-color: red;

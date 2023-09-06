@@ -687,11 +687,7 @@ function Toolbar({ onPlay, isPlaying, onSeek, videos }) {
     try {
       // Mix the audio with the main audio file and other tracks
       const newAudio = await joinVideo({ files: videos });
-      console.log("🚀 ~ file: VideoJoiner.jsx:690 ~ exportVideoFile ~ newAudio:", newAudio)
 
-      // newAudio.forEach((a) => {
-      //   createDownloadAudioLink(a);
-      // })
       // Create a link to download the new audio
       createDownloadAudioLink(newAudio);
     } catch (error) {
@@ -789,92 +785,93 @@ const TracksContext = createContext();
 TracksContext.displayName = "TracksContext";
 
 const Tracks = ({ videos }) => {
+  const nodes = useRef([]);
   const { containerSize } = useEditPanel();
   const { frames } = useFrame({
     videos,
     parentSize: containerSize,
   });
 
-  const nodes = useRef([]);
+  const getStyles = (node, property) => {
+    return window.getComputedStyle(node).getPropertyValue(property)
+  }
 
-  const setNodesRef = (drag) => {
+  const test = (id) => {
+    const activeDrag = nodes.current.find((ref) => ref.id === id);
+    const elementStuff = activeDrag.getBoundingClientRect();
+
+    const matchingNodes = nodes.current.filter((node) => {
+      if (node.id === id) return false;
+
+      const nodeStuff = node.getBoundingClientRect();
+
+      return aabb(elementStuff, nodeStuff);
+    });
+
+    const ID = matchingNodes.map((node) => {
+      const nodeStuff = node.getBoundingClientRect();
+      console.log(
+        "🚀 ~ file: VideoJoiner.jsx:810 ~ ID ~ nodeStuff:",
+        nodeStuff
+      );
+      const intersection = calculateIntersection(elementStuff, nodeStuff);
+
+      intersection.differenceX = elementStuff.x - nodeStuff.x;
+
+      // intersection.differenceX = elementStuff.x - nodeStuff.x;
+      
+      if (intersection.differenceX > 0) {
+        node.parentNode.style.setProperty(
+          "--track-left",
+          `${parseInt(getStyles(node.parentNode, '--track-left')) - intersection.width + 3}px`
+        );
+      } else {
+        node.parentNode.style.setProperty(
+          "--track-left",
+          `${parseInt(getStyles(node.parentNode, '--track-left')) + intersection.width + 3}px`
+        );
+      }
+
+      return {
+        id: node.id,
+        widthZ: nodeStuff.width,
+        x: nodeStuff.x,
+        y: nodeStuff.y,
+        intersection,
+      };
+    });
+
+    return ID;
+  };
+
+  function calculateIntersection(a, b) {
+    const x1 = Math.max(a.x, b.x);
+    const x2 = Math.min(a.x + a.width, b.x + b.width);
+
+    return {
+      x: x1,
+      width: x2 - x1,
+    };
+  }
+
+  const setNodes = (drag) => {
     const dragIndex = nodes.current.findIndex((ref) => ref.id === drag.id);
 
     if (dragIndex >= 0) return;
     nodes.current.push(drag);
   };
 
-  const getStyles = (node, property) => {
-    return window.getComputedStyle(node).getPropertyValue(property);
-  };
-
-  const AxisAlignedBoundingBox = (a, b) => {
+  function aabb(a, b) {
     return (
       a.x < b.x + b.width &&
       a.x + a.width > b.x &&
       a.y < b.y + b.height &&
       a.y + a.height > b.y
     );
-  };
-
-  const calculateIntersection = (a, b) => {
-    const x1 = Math.max(a.x, b.x);
-    const x2 = Math.min(a.x + a.width, b.x + b.width);
-    const differenceX = a.x - b.x;
-
-    return {
-      differenceX,
-      gap: (x2 - x1) + 3,
-    };
-  };
-
-  const test = (id) => {
-    const activeElement = nodes.current.find((ref) => ref.id === id);
-    const activeElementCoordinates = activeElement.getBoundingClientRect();
-
-    const matchingNodes = nodes.current.filter((node) => {
-      if (node.id === id) return false;
-
-      const sliblingElementCoordinates = node.getBoundingClientRect();
-
-      return AxisAlignedBoundingBox(
-        activeElementCoordinates,
-        sliblingElementCoordinates
-      );
-    });
-
-    console.log("Live");
-    if (matchingNodes.length === 0) return 0;
-    console.log("Death");
-
-    const moveElements = matchingNodes.map((node) => {
-      const sliblingElementCoordinates = node.getBoundingClientRect();
-      const intersection = calculateIntersection(
-        activeElementCoordinates,
-        sliblingElementCoordinates
-      );
-
-      return {
-        id: node.id,
-        intersection,
-      };
-    });
-
-    console.log(moveElements);
-    const sum = moveElements.reduce(
-      (a, b) => ({
-        a: a.a + b.intersection.differenceX,
-        b: a.b + b.intersection.gap,
-      }),
-      { a: 0, b: 0 }
-    );
-
-    // return moveElements;
-    return sum.a > 0 ? sum.b : -sum.b;
-  };
+  }
 
   return (
-    <TracksContext.Provider value={{ setNodesRef, test }}>
+    <TracksContext.Provider value={{ setNodes, test }}>
       <ol className={css.track}>
         <li>
           <div className={css.track__item}>
@@ -896,9 +893,8 @@ const Tracks = ({ videos }) => {
 };
 
 function Drag({ children, ...props }) {
+  const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
   const { test } = useContext(TracksContext);
-
-  const [coordinates, setCoordinates] = useState({ axisX: 0 });
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -906,32 +902,27 @@ function Drag({ children, ...props }) {
     useSensor(KeyboardSensor)
   );
 
-  const handleDragEnd = (event) => {
-    const { delta } = event;
-    const {
-      active: { id },
-    } = event;
-    const { axisX } = coordinates;
+  const handleDragEnd = (e) => {
+    const { delta } = e;
+    const { x: axisX, y: axisY } = coordinates;
 
     const newCoordinates = {
-      axisX: axisX + delta.x,
+      x: axisX + delta.x,
+      y: axisY + delta.y,
     };
 
-    const gapBetweenDrags = test(id);
-    console.log("🚀", gapBetweenDrags);
+    const shakira = test(e.active.id);
 
-    console.log("🚀 Before:", newCoordinates);
-    newCoordinates.axisX += gapBetweenDrags;
+    // shakira.forEach((hijo) => {
+    //   console.log("🚀 ~ file: VideoJoiner.jsx:899 ~ shakira.forEach ~ hijo:", hijo.intersection.differenceX)
+    //   // newCoordinates.x += hijo.intersection.width + 3;
+    //   if ( hijo.intersection.differenceX > 0) {
+    //     newCoordinates.x += hijo.intersection.width + 3;
+    //   } else {
+    //     newCoordinates.x -= hijo.intersection.width + 3;
+    //   }
+    // });
 
-    // gapBetweenDrags.forEach((drag) => {
-    //     if (drag.intersection.differenceX > 0) {
-    //         newCoordinates.axisX += drag.intersection.gap + 3;
-    //       } else {
-    //           newCoordinates.axisX -= drag.intersection.gap + 3;
-    //         }
-    //       });
-
-    console.log("🚀 After:", newCoordinates);
     setCoordinates(newCoordinates);
   };
 
@@ -941,7 +932,7 @@ function Drag({ children, ...props }) {
       modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
       onDragEnd={handleDragEnd}
     >
-      <Drag.Item axisX={coordinates.axisX} {...props}>
+      <Drag.Item axisX={coordinates.x} {...props}>
         {children}
       </Drag.Item>
     </DndContext>
@@ -950,13 +941,13 @@ function Drag({ children, ...props }) {
 
 const Item = ({ children, id, parentSize, duration, axisX }) => {
   const { listeners, setNodeRef, transform } = useDraggable({ id });
-  const { setNodesRef } = useContext(TracksContext);
+  const { setNodes } = useContext(TracksContext);
 
   const refContainer = useRef();
 
   useEffect(() => {
     if (refContainer.current !== null) {
-      setNodesRef(refContainer.current);
+      setNodes(refContainer.current);
     }
   }, [refContainer.current]);
 

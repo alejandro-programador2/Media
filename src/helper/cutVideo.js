@@ -12,7 +12,8 @@ const cutVideo = async ({ file, startTime, endTime }) => {
 
     // Write the file to memory
     ffmpeg.FS("writeFile", file.name, await fetchFile(file));
-
+    
+    console.log(fileOutputName)
     // Run the FFMpeg command
     await ffmpeg.run(
         "-i",
