@@ -6,7 +6,6 @@ import {
   memo,
   useLayoutEffect,
   useMemo,
-  createContext,
   useContext,
 } from "react";
 import PropTypes from "prop-types";
@@ -18,7 +17,6 @@ import {
   TouchSensor,
   MouseSensor,
   useDraggable,
-  useDndContext,
 } from "@dnd-kit/core";
 import {
   restrictToHorizontalAxis,
@@ -35,16 +33,20 @@ import {
   PlayIcon,
 } from "./icons";
 
-import css from "./VideoJoiner.module.css";
+import { LINE_GAP, TIMELINE_PADDING, EVENTS } from "./const";
+import { EditPanelContext, TracksContext } from "./context";
+
+import joinVideo from "../../helper/joinVideo";
 import converterTime from "../../helper/converterTime";
 
-import { LINE_GAP, TIMELINE_PADDING, EVENTS } from "./const";
-import joinVideo from "../../helper/joinVideo";
-
-const EditPanelContext = createContext();
+import css from "./VideoJoiner.module.css";
 
 const useEditPanel = () => {
   return useContext(EditPanelContext);
+};
+
+const usePositionTrack = () => {
+  return useContext(TracksContext);
 };
 
 function useResize({ id, container, duration, parentSize }) {
@@ -70,11 +72,11 @@ function useResize({ id, container, duration, parentSize }) {
     }
   }, [container]);
 
-  const newTimeEvent = () => {
+  const createTrackTimeUpdateEvent = (width) => {
     const minPxPerSec = parentSize / duration;
-    const timeInSeconds = Number((size.current.width / minPxPerSec).toFixed(3));
-
-    const event = new CustomEvent("time", {
+    const timeInSeconds = Number((width / minPxPerSec).toFixed(3));
+    console.log("llamo ⏩", timeInSeconds);
+    const event = new CustomEvent(EVENTS.TRACKTIMEUPDATE, {
       detail: { id, time: timeInSeconds },
     });
 
@@ -150,7 +152,7 @@ function useResize({ id, container, duration, parentSize }) {
           width: `${size.current.width}px`,
         });
 
-        document.dispatchEvent(newTimeEvent());
+        document.dispatchEvent(createTrackTimeUpdateEvent(size.current.width));
 
         // Actualizar la posición inicial del puntero para la próxima vez
         startXRef.current = x;
@@ -192,12 +194,14 @@ function useResize({ id, container, duration, parentSize }) {
       const minPxPerSec = parentSize / duration;
 
       // Calcular el tamaño base en función de la duración y el número mínimo de píxeles por segundo
-      const baseSize = duration * minPxPerSec;
+      const baseSize = Math.ceil(duration * minPxPerSec);
 
       size.current.base = baseSize;
       size.current.width = baseSize;
 
-      document.dispatchEvent(newTimeEvent());
+      console.log("Se llamo 🎉⏩⏪");
+
+      document.dispatchEvent(createTrackTimeUpdateEvent(baseSize));
 
       setStyles((prevStyles) => ({
         ...prevStyles,
@@ -331,15 +335,6 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
   const intervalID = useRef(null);
   const currentTime = useRef(0);
 
-  // const setNewRefVideo = (video) => {
-  //   const videoElementIndex = videoElementsRef.current.findIndex(
-  //     (ref) => ref.id === video.id
-  //   );
-
-  //   if (videoElementIndex >= 0) return;
-  //   videoElementsRef.current.push(video);
-  // };
-
   const getCurrentVideo = () => {
     // Buscar el video actual en función del tiempo actual
     const currentVideo = videoElementsRef.find(
@@ -390,7 +385,7 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
 
   const updateTimeEvent = () => {
     // Crear un evento personalizado para indicar la actualización de tiempo en el track de video
-    const timeUpdatedEvent = new Event("timeUpdated");
+    const timeUpdatedEvent = new Event(EVENTS.TIMELINETIMEUPDATE);
 
     // Calcular píxeles por segundo en el timeline del editor de video
     const pixelsPerSecond = parentSize / duration;
@@ -454,6 +449,41 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
     }
   };
 
+  const addEvents = (ref) => {
+    const updatedTime = ({ detail }) => {
+      const { id, time } = detail;
+
+      const videoIndex = ref.findIndex((video) => video.id === id);
+
+      if (videoIndex !== -1) {
+        setVideoElementRef((prev) => [
+          ...prev.slice(0, videoIndex),
+          { ...prev[videoIndex], duration: time },
+          ...prev.slice(videoIndex + 1),
+        ]);
+      }
+    };
+
+    const updatedStartTime = ({ detail }) => {
+      const { id, axisX } = detail;
+
+      const pixelsPerSecond = parentSize / duration;
+      const timeInSeconds = Number((axisX / pixelsPerSecond).toFixed(3));
+      const videoIndex = ref.findIndex((video) => video.id === id);
+
+      if (videoIndex !== -1) {
+        setVideoElementRef((prev) => [
+          ...prev.slice(0, videoIndex),
+          { ...prev[videoIndex], timestart: timeInSeconds },
+          ...prev.slice(videoIndex + 1),
+        ]);
+      }
+    };
+
+    document.addEventListener(EVENTS.TRACKTIMEUPDATE, updatedTime);
+    document.addEventListener(EVENTS.TRACKLEFTSIDECHANGED, updatedStartTime);
+  };
+
   function videoElements(videos) {
     return videos.map((id) => {
       const videoElement = document.querySelector(`video[id="${id}"]`);
@@ -468,54 +498,64 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
 
   useLayoutEffect(() => {
     if (videosID.length > 0) {
-      setVideoElementRef(videoElements(videosID));
+      const videosState = videoElements(videosID);
+      addEvents(videosState);
+
+      setVideoElementRef(videosState);
     }
-  }, [videosID]);
+  }, [videosID, parentSize, duration]);
+
+  // useEffect(() => {
+  //   if (videoElementsRef.length === 0) return;
+
+  //   const updatedTime = ({ detail }) => {
+  //     const { id, time } = detail;
+
+  //     const videoIndex = videoElementsRef.findIndex((video) => video.id === id);
+
+  //     if (videoIndex !== -1) {
+  //       setVideoElementRef((prev) => (
+  //         [
+  //           ...prev.slice(0, videoIndex),
+  //           { ...prev[videoIndex], duration: time },
+  //           ...prev.slice(videoIndex + 1),
+  //         ]
+  //       ));
+  //     }
+  //   };
+
+  //   const updatedStartTime = ({ detail }) => {
+  //     const { id, axisX } = detail;
+
+  //     const pixelsPerSecond = parentSize / duration;
+  //     const timeInSeconds = Number((axisX / pixelsPerSecond).toFixed(3));
+
+  //     const videoIndex = videoElementsRef.findIndex((video) => video.id === id);
+  //     if (videoIndex !== -1) {
+  //       const newState = [
+  //         ...videoElementsRef.slice(0, videoIndex),
+  //         { ...videoElementsRef[videoIndex], timestart: timeInSeconds },
+  //         ...videoElementsRef.slice(videoIndex + 1),
+  //       ];
+
+  //       setVideoElementRef(newState);
+  //     }
+  //   };
+
+  //   document.addEventListener(EVENTS.TRACKTIMEUPDATE, updatedTime);
+  //   document.addEventListener(EVENTS.TRACKLEFTSIDECHANGED, updatedStartTime);
+
+  //   return () => {
+  //     document.removeEventListener(EVENTS.TRACKTIMEUPDATE, updatedTime);
+  //     document.removeEventListener(EVENTS.TRACKLEFTSIDECHANGED, updatedStartTime);
+  //   };
+  // }, [videoElementsRef]);
 
   useEffect(() => {
-    if (videoElementsRef.length === 0) return;
-
-    const updatedTime = ({ detail }) => {
-      const { id, time } = detail;
-
-      const videoIndex = videoElementsRef.findIndex((video) => video.id === id);
-
-      if (videoIndex !== -1) {
-        const newState = [
-          ...videoElementsRef.slice(0, videoIndex),
-          { ...videoElementsRef[videoIndex], duration: time },
-          ...videoElementsRef.slice(videoIndex + 1),
-        ];
-
-        setVideoElementRef(newState);
-      }
-    };
-
-    const updatedStartTime = ({ detail }) => {
-      const { id, axisX } = detail;
-
-      const pixelsPerSecond = parentSize / duration;
-      const timeInSeconds = Number((axisX / pixelsPerSecond).toFixed(3));
-
-      const videoIndex = videoElementsRef.findIndex((video) => video.id === id);
-      if (videoIndex !== -1) {
-        const newState = [
-          ...videoElementsRef.slice(0, videoIndex),
-          { ...videoElementsRef[videoIndex], timestart: timeInSeconds },
-          ...videoElementsRef.slice(videoIndex + 1),
-        ];
-
-        setVideoElementRef(newState);
-      }
-    };
-
-    document.addEventListener("time", updatedTime);
-    document.addEventListener("leftSideEvent", updatedStartTime);
-
-    return () => {
-      document.removeEventListener("time", updatedTime);
-      document.removeEventListener("leftSideEvent", updatedStartTime);
-    };
+    console.log(
+      "🚀 ~ file: VideoJoiner.jsx:604 ~ .map ~ duration:",
+      videoElementsRef[0]?.duration
+    );
   }, [videoElementsRef]);
 
   return {
@@ -601,8 +641,7 @@ const EditPanel = memo(({ videos }) => {
     lineGap: LINE_GAP,
   });
 
-  // const [transformedVideoStats, setTransformedVideoStats] = useState([]);
-
+ 
   const transformedVideoStats = useMemo(() => {
     if (videoStats.length === 0) return [];
 
@@ -656,7 +695,7 @@ const EditPanel = memo(({ videos }) => {
   );
 });
 
-function Toolbar({ onPlay, isPlaying, onSeek, videos }) {
+function Toolbar({ onPlay, isPlaying, videos }) {
   const { duration } = useEditPanel();
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -665,10 +704,10 @@ function Toolbar({ onPlay, isPlaying, onSeek, videos }) {
       setCurrentTime(currentTime);
     };
 
-    document.addEventListener("timeUpdated", updateTime);
+    document.addEventListener(EVENTS.TIMELINETIMEUPDATE, updateTime);
 
     return () => {
-      document.removeEventListener("timeUpdated", updateTime);
+      document.removeEventListener(EVENTS.TIMELINETIMEUPDATE, updateTime);
     };
   }, []);
 
@@ -687,11 +726,11 @@ function Toolbar({ onPlay, isPlaying, onSeek, videos }) {
     try {
       // Mix the audio with the main audio file and other tracks
       const newAudio = await joinVideo({ files: videos });
-      console.log("🚀 ~ file: VideoJoiner.jsx:690 ~ exportVideoFile ~ newAudio:", newAudio)
+      console.log(
+        "🚀 ~ file: VideoJoiner.jsx:690 ~ exportVideoFile ~ newAudio:",
+        newAudio
+      );
 
-      // newAudio.forEach((a) => {
-      //   createDownloadAudioLink(a);
-      // })
       // Create a link to download the new audio
       createDownloadAudioLink(newAudio);
     } catch (error) {
@@ -702,21 +741,20 @@ function Toolbar({ onPlay, isPlaying, onSeek, videos }) {
   return (
     <div className={css["toolbar"]}>
       <p>{converterTime(duration)}</p>
-      {/* <button onClick={() => onSeek(-10)}>
-        <FastRewindIcon />
-      </button> */}
+      {/* <button onClick={() => onSeek(-10)}> */}
+       
 
-      {/* <button>
+      <button className={css["toolbar__normal-button"]}>
         <FastRewindIcon />
-      </button> */}
+      </button>
 
-      <button onClick={onPlay} className={css["toolbar__play-button"]}>
+      <button onClick={onPlay} className={css["toolbar__normal-button"]}>
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </button>
 
-      {/* <button>
+      <button className={css["toolbar__normal-button"]}>
         <FastForwardIcon />
-      </button> */}
+      </button>
 
       <p>{converterTime(currentTime)}</p>
 
@@ -740,10 +778,10 @@ function Tracker() {
       setAxisX(Math.floor((currentTime / duration) * timeLineSize));
     };
 
-    document.addEventListener("timeUpdated", updateTime);
+    document.addEventListener(EVENTS.TIMELINETIMEUPDATE, updateTime);
 
     return () => {
-      document.removeEventListener("timeUpdated", updateTime);
+      document.removeEventListener(EVENTS.TIMELINETIMEUPDATE, updateTime);
     };
   }, [timeLineSize]);
 
@@ -785,9 +823,6 @@ function TimeLine() {
   return <div className={`${css.timeline}`}>{duration ? lines : null}</div>;
 }
 
-const TracksContext = createContext();
-TracksContext.displayName = "TracksContext";
-
 const Tracks = ({ videos }) => {
   const { containerSize } = useEditPanel();
   const { frames } = useFrame({
@@ -804,10 +839,6 @@ const Tracks = ({ videos }) => {
     nodes.current.push(drag);
   };
 
-  const getStyles = (node, property) => {
-    return window.getComputedStyle(node).getPropertyValue(property);
-  };
-
   const AxisAlignedBoundingBox = (a, b) => {
     return (
       a.x < b.x + b.width &&
@@ -820,15 +851,19 @@ const Tracks = ({ videos }) => {
   const calculateIntersection = (a, b) => {
     const x1 = Math.max(a.x, b.x);
     const x2 = Math.min(a.x + a.width, b.x + b.width);
-    const differenceX = a.x - b.x;
-
-    return {
-      differenceX,
-      gap: (x2 - x1) + 3,
-    };
+    return x2 - x1;
   };
 
-  const test = (id) => {
+  const isInside = (a, b) => a.x >= b.x && a.x + a.width <= b.x + b.width;
+
+  const distanceToExitX = (a, b) => {
+    const leftDistance = b.x - (a.x + a.width);
+    const rightDistance = a.x - (b.x + b.width);
+
+    return Math.min(leftDistance, rightDistance);
+  };
+
+  const calculateXAxisGap = (id) => {
     const activeElement = nodes.current.find((ref) => ref.id === id);
     const activeElementCoordinates = activeElement.getBoundingClientRect();
 
@@ -843,38 +878,64 @@ const Tracks = ({ videos }) => {
       );
     });
 
-    console.log("Live");
     if (matchingNodes.length === 0) return 0;
-    console.log("Death");
 
-    const moveElements = matchingNodes.map((node) => {
-      const sliblingElementCoordinates = node.getBoundingClientRect();
+    // TODO: Fix position of active element when it's between two elements.
+    // if (matchingNodes.length > 1) {
+    //   const moveElements = matchingNodes.reduce((beforeNode, afterNode) => {
+    //     const beforeNodeIntersection = calculateIntersection(
+    //       activeElementCoordinates,
+    //       beforeNode.getBoundingClientRect()
+    //     );
+
+    //     const afterNodeIntersection = calculateIntersection(
+    //       activeElementCoordinates,
+    //       afterNode.getBoundingClientRect()
+    //     );
+
+    //     if (beforeNodeIntersection.gap > afterNodeIntersection.gap) {
+    //       console.log(beforeNodeIntersection.gap, afterNodeIntersection.gap)
+    //       return (
+    //         beforeNode.getBoundingClientRect().width + afterNodeIntersection.gap
+    //       );
+    //     }
+
+    //     return (
+    //       (afterNode.getBoundingClientRect().width - afterNodeIntersection.gap) + afterNodeIntersection.gap
+    //     );
+    //   });
+
+    //   return moveElements;
+    // }
+
+    let newAxisX = 0;
+
+    for (const node of matchingNodes) {
+      const siblingElementCoordinates = node.getBoundingClientRect();
+      const differenceX =
+        activeElementCoordinates.x - siblingElementCoordinates.x;
+
+      if (isInside(activeElementCoordinates, siblingElementCoordinates)) {
+        const distance = distanceToExitX(
+          activeElementCoordinates,
+          siblingElementCoordinates
+        );
+        newAxisX += differenceX > 0 ? distance : -distance;
+        continue;
+      }
+
       const intersection = calculateIntersection(
         activeElementCoordinates,
-        sliblingElementCoordinates
+        siblingElementCoordinates
       );
+      newAxisX += differenceX > 0 ? intersection : -intersection;
+    }
 
-      return {
-        id: node.id,
-        intersection,
-      };
-    });
-
-    console.log(moveElements);
-    const sum = moveElements.reduce(
-      (a, b) => ({
-        a: a.a + b.intersection.differenceX,
-        b: a.b + b.intersection.gap,
-      }),
-      { a: 0, b: 0 }
-    );
-
-    // return moveElements;
-    return sum.a > 0 ? sum.b : -sum.b;
+    return newAxisX;
   };
 
   return (
-    <TracksContext.Provider value={{ setNodesRef, test }}>
+    <TracksContext.Provider value={{ setNodesRef, calculateXAxisGap }}>
       <ol className={css.track}>
         <li>
           <div className={css.track__item}>
@@ -890,13 +951,16 @@ const Tracks = ({ videos }) => {
             ))}
           </div>
         </li>
+        <li>
+          <div className={css.track__item}></div>
+        </li>
       </ol>
     </TracksContext.Provider>
   );
 };
 
 function Drag({ children, ...props }) {
-  const { test } = useContext(TracksContext);
+  const { calculateXAxisGap } = usePositionTrack();
 
   const [coordinates, setCoordinates] = useState({ axisX: 0 });
 
@@ -917,20 +981,11 @@ function Drag({ children, ...props }) {
       axisX: axisX + delta.x,
     };
 
-    const gapBetweenDrags = test(id);
+    const gapBetweenDrags = calculateXAxisGap(id);
     console.log("🚀", gapBetweenDrags);
 
     console.log("🚀 Before:", newCoordinates);
     newCoordinates.axisX += gapBetweenDrags;
-
-    // gapBetweenDrags.forEach((drag) => {
-    //     if (drag.intersection.differenceX > 0) {
-    //         newCoordinates.axisX += drag.intersection.gap + 3;
-    //       } else {
-    //           newCoordinates.axisX -= drag.intersection.gap + 3;
-    //         }
-    //       });
-
     console.log("🚀 After:", newCoordinates);
     setCoordinates(newCoordinates);
   };
@@ -950,7 +1005,7 @@ function Drag({ children, ...props }) {
 
 const Item = ({ children, id, parentSize, duration, axisX }) => {
   const { listeners, setNodeRef, transform } = useDraggable({ id });
-  const { setNodesRef } = useContext(TracksContext);
+  const { setNodesRef } = usePositionTrack();
 
   const refContainer = useRef();
 
@@ -967,8 +1022,8 @@ const Item = ({ children, id, parentSize, duration, axisX }) => {
     duration,
   });
 
-  const createLeftSideEvent = (axisX) =>
-    new CustomEvent("leftSideEvent", { detail: { id, axisX } });
+  const createtrackLeftSideChangedEvent = (axisX) =>
+    new CustomEvent(EVENTS.TRACKLEFTSIDECHANGED, { detail: { id, axisX } });
 
   const calculateNewTrackLeft = useMemo(
     () => parseInt(styles.left) + axisX,
@@ -976,7 +1031,7 @@ const Item = ({ children, id, parentSize, duration, axisX }) => {
   );
 
   useLayoutEffect(() => {
-    const event = createLeftSideEvent(calculateNewTrackLeft);
+    const event = createtrackLeftSideChangedEvent(calculateNewTrackLeft);
     document.dispatchEvent(event);
   }, [calculateNewTrackLeft]);
 

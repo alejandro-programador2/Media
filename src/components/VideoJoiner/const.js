@@ -5,9 +5,8 @@ export const TIMELINE_PADDING = Object.freeze({
     DECREASE: 0.9, // It's equal to 90%
 });
 
-
 export const EVENTS = Object.freeze({
-    TRACKLEFT: "TrackLeftChange",
-    TIMECHANGE: "TimeChangeEvent",
-    TRACKTIME: "TrackTimeUpdate",
+    TIMELINETIMEUPDATE: "timelineTimeUpdate",
+    TRACKLEFTSIDECHANGED: "trackLeftSideChanged",
+    TRACKTIMEUPDATE: "trackTimeUpdate",
 });

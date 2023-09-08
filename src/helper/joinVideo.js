@@ -12,9 +12,6 @@ const joinVideo = async ({ files }) => {
     let filterComplex = "";
 
     try {
-        // Asegurémonos de que todos los videos tengan la misma tasa de fotogramas
-        let commonFrameRate = null;
-
         // Cut the audio files
         for (let i = 0; i < files.length; i++) {
             const { file } = await cutVideo({
@@ -34,28 +31,22 @@ const joinVideo = async ({ files }) => {
                     '-c:v', 'libx264',
                     '-c:a', 'aac',
                     '-strict', 'experimental',
-                    '-r', commonFrameRate || '30', // Establecer la tasa de fotogramas
+                    '-r', '30', // Establecer la tasa de fotogramas
                     scaledFileName
                 );
             } catch (error) {
                 console.log(error);
             }
 
-
-            // Obtener la tasa de fotogramas del video escalado
-            const ffprobeData = await ffmpeg.run('-i', scaledFileName);
-
-            if (ffprobeData && ffprobeData.stderr) {
-                const frameRateMatch = ffprobeData.stderr.match(/(\d+(\.\d+)? fps)/);
-                if (frameRateMatch) {
-                    commonFrameRate = parseFloat(frameRateMatch[1]);
-                }
-            }
-
             scaledFiles.push(scaledFileName);
 
             // Agrega los videos redimensionados al filtro complex
-            filterComplex += `[${i}:v][${i}:a]`;
+            filterComplex += `[${i}:v]setpts=PTS-STARTPTS[${i}v];[${i}:a]asetpts=PTS-STARTPTS[${i}a];`;
+        }
+
+        // Configura la cadena de filtro complejo para la concatenación
+        for (let i = 0; i < files.length; i++) {
+            filterComplex += `[${i}v][${i}a]`;
         }
 
         // Configura la cadena de filtro complex para la concatenación

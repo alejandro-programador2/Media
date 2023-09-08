@@ -60,6 +60,7 @@ header div>a {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    overflow: hidden;
 }
 
 .toolbar {
@@ -78,7 +79,7 @@ header div>a {
     transition: background-color 500ms ease;
 }
 
-.toolbar__play-button {
+.toolbar__normal-button {
     --size: 2.3rem;
 
     display: flex;
@@ -88,7 +89,7 @@ header div>a {
     padding-inline: 0.3rem;
 }
 
-.toolbar__play-button svg {
+.toolbar__normal-button svg {
     display: block;
     width: var(--size);
     height: var(--size);
@@ -122,15 +123,15 @@ header div>a {
     position: relative;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* overflow: hidden; */
     flex: 1;
     overflow-x: scroll;
-    overflow-y: hidden;
+    /* overflow-y: hidden; */
     margin-inline: .625rem;
 }
 
 .work-area::-webkit-scrollbar {
-    height: .375rem;
+    height: .4375rem;
 }
 
 .work-area::-webkit-scrollbar-thumb {
@@ -149,7 +150,7 @@ header div>a {
 .tracker {
     position: absolute;
     top: 0;
-    width: 2px;
+    width: 1px;
     height: 100%;
     background-color: var(--main-color);
     z-index: 40;
@@ -161,7 +162,7 @@ header div>a {
 .tracker__header-triangle
 {
     position: absolute;
-    left: 50%;
+    left: calc(50% - 1px);
     border-radius: 0.125rem;
     background-color: var(--main-color);
 }
@@ -170,14 +171,14 @@ header div>a {
     width: 12px;
     height: 12px;
     top: 0;
-    transform: translateX(-50%);
+    transform: translateX(calc(-50% + 1px));
 }
 
 .tracker__header-triangle {
     width: 9px;
     height: 9px;
     top: 6px;
-    transform: translateX(-50%) rotate(45deg);
+    transform: translateX(calc(-50% + 1px)) rotate(45deg);
 }
 
 
@@ -186,6 +187,7 @@ header div>a {
 
     position: relative;
     cursor: pointer;
+    width: var(--width-container);
     height: 42px;
     background-image: linear-gradient(90deg, var(--color-border), var(--color-border));
     background-position: 0 100%;
@@ -200,15 +202,14 @@ header div>a {
 }
 
 .track>li {
+    --height: 3.5rem;
     position: relative;
 }
 
 .track__item {
-    --height: 3.5rem;
-
-    position: absolute;
+    position: relative;
     display: inline-block;
-    margin-block-end: .625rem;
+    /* margin-block-end: .625rem; */
     height: var(--height);
     width: var(--width-container);
     transition: height 33ms linear;
