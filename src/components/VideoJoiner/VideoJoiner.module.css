@@ -214,7 +214,7 @@ header div>a {
     width: var(--width-container);
     transition: height 33ms linear;
     border-radius: .3125rem;
-    background-color: red;
+    background-color: #1B1E22;
 }
 
 .frame {

@@ -75,7 +75,7 @@ function useResize({ id, container, duration, parentSize }) {
   const createTrackTimeUpdateEvent = (width) => {
     const minPxPerSec = parentSize / duration;
     const timeInSeconds = Number((width / minPxPerSec).toFixed(3));
-    console.log("llamo ⏩", timeInSeconds);
+
     const event = new CustomEvent(EVENTS.TRACKTIMEUPDATE, {
       detail: { id, time: timeInSeconds },
     });
@@ -133,7 +133,13 @@ function useResize({ id, container, duration, parentSize }) {
         // Verificar si la posición izquierda ha cambiado para calcular el desplazamiento
         if (size.current.left !== newLeft) {
           // Calcular el desplazamiento izquierdo basado en la diferencia entre el nuevo ancho y el tamaño base
-          size.current.leftOffset = newWidth - size.current.base;
+          size.current.leftOffset = size.current.base - newWidth;
+        }
+
+        // Verificar si el newLeft es igual a 0 si es así reinicar el leftOffset
+        // para permitir nueva mente el resize usando el side right.
+        if (newLeft === 0) {
+          size.current.leftOffset = 0;
         }
 
         // Calcular de que el ancho actual no exceda el tamaño base ajustando si es necesario
@@ -198,8 +204,6 @@ function useResize({ id, container, duration, parentSize }) {
 
       size.current.base = baseSize;
       size.current.width = baseSize;
-
-      console.log("Se llamo 🎉⏩⏪");
 
       document.dispatchEvent(createTrackTimeUpdateEvent(baseSize));
 
@@ -449,6 +453,22 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
     }
   };
 
+  const onSeek = (seconds) => {
+    const newCurrentTime = currentTime.current + seconds;
+
+    if (newCurrentTime >= 0 && newCurrentTime <= duration) {
+      const video = getCurrentVideo();
+
+      if (video) {
+        const { videoElement } = video;
+        videoElement.currentTime += seconds;
+      }
+
+      currentTime.current += seconds;
+      handleCurrentVideo();
+    }
+  };
+
   const addEvents = (ref) => {
     const updatedTime = ({ detail }) => {
       const { id, time } = detail;
@@ -484,8 +504,8 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
     document.addEventListener(EVENTS.TRACKLEFTSIDECHANGED, updatedStartTime);
   };
 
-  function videoElements(videos) {
-    return videos.map((id) => {
+  const videoElements = (videos) =>
+    videos.map((id) => {
       const videoElement = document.querySelector(`video[id="${id}"]`);
       return {
         id,
@@ -494,7 +514,6 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
         duration: 0,
       };
     });
-  }
 
   useLayoutEffect(() => {
     if (videosID.length > 0) {
@@ -551,17 +570,11 @@ const useTrack = ({ videosID, parentSize, duration, lineGap }) => {
   //   };
   // }, [videoElementsRef]);
 
-  useEffect(() => {
-    console.log(
-      "🚀 ~ file: VideoJoiner.jsx:604 ~ .map ~ duration:",
-      videoElementsRef[0]?.duration
-    );
-  }, [videoElementsRef]);
-
   return {
     isPlaying,
     onPlay,
     onPause,
+    onSeek,
     videoStats: videoElementsRef,
   };
 };
@@ -634,14 +647,13 @@ const EditPanel = memo(({ videos }) => {
     [containerSize, videos]
   );
 
-  const { isPlaying, onPlay, onPause, videoStats } = useTrack({
+  const { isPlaying, onPlay, onPause, onSeek, videoStats } = useTrack({
     videosID,
     parentSize: timeLineSize,
     duration,
     lineGap: LINE_GAP,
   });
 
- 
   const transformedVideoStats = useMemo(() => {
     if (videoStats.length === 0) return [];
 
@@ -672,6 +684,7 @@ const EditPanel = memo(({ videos }) => {
     >
       <section className={css["edit-panel"]}>
         <Toolbar
+          onSeek={onSeek}
           onPlay={onTogglePlay}
           isPlaying={isPlaying}
           videos={transformedVideoStats}
@@ -695,7 +708,7 @@ const EditPanel = memo(({ videos }) => {
   );
 });
 
-function Toolbar({ onPlay, isPlaying, videos }) {
+function Toolbar({ onPlay, isPlaying, videos, onSeek }) {
   const { duration } = useEditPanel();
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -721,15 +734,9 @@ function Toolbar({ onPlay, isPlaying, videos }) {
   };
 
   const exportVideoFile = async () => {
-    console.log(JSON.stringify(videos));
-
     try {
       // Mix the audio with the main audio file and other tracks
       const newAudio = await joinVideo({ files: videos });
-      console.log(
-        "🚀 ~ file: VideoJoiner.jsx:690 ~ exportVideoFile ~ newAudio:",
-        newAudio
-      );
 
       // Create a link to download the new audio
       createDownloadAudioLink(newAudio);
@@ -741,10 +748,11 @@ function Toolbar({ onPlay, isPlaying, videos }) {
   return (
     <div className={css["toolbar"]}>
       <p>{converterTime(duration)}</p>
-      {/* <button onClick={() => onSeek(-10)}> */}
-       
 
-      <button className={css["toolbar__normal-button"]}>
+      <button
+        className={css["toolbar__normal-button"]}
+        onClick={() => onSeek(-10)}
+      >
         <FastRewindIcon />
       </button>
 
@@ -752,7 +760,10 @@ function Toolbar({ onPlay, isPlaying, videos }) {
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </button>
 
-      <button className={css["toolbar__normal-button"]}>
+      <button
+        className={css["toolbar__normal-button"]}
+        onClick={() => onSeek(10)}
+      >
         <FastForwardIcon />
       </button>
 
@@ -982,11 +993,8 @@ function Drag({ children, ...props }) {
     };
 
     const gapBetweenDrags = calculateXAxisGap(id);
-    console.log("🚀", gapBetweenDrags);
-
-    console.log("🚀 Before:", newCoordinates);
+    
     newCoordinates.axisX += gapBetweenDrags;
-    console.log("🚀 After:", newCoordinates);
     setCoordinates(newCoordinates);
   };
 
