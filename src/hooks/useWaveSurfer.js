@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import WaveSurfer from "https://unpkg.com/wavesurfer.js@beta";
+import WaveSurfer from 'wavesurfer.js'
 
 export const useWaveSurfer = (element, props) => {
     const [wavesurfer, setWaveSurfer] = useState(null)

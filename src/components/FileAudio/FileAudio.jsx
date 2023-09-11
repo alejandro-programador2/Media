@@ -2,7 +2,7 @@ import { useId } from "react";
 import PropTypes from "prop-types";
 import css from "./FileAudio.module.css";
 
-export function FileAudio({ multiple, onFile, label, rounded, className }) {
+export function FileAudio({ multiple, onFile, label, rounded, className, accept }) {
   const inputId = useId();
 
   const handleChange = async ({ target }) => {
@@ -52,7 +52,7 @@ export function FileAudio({ multiple, onFile, label, rounded, className }) {
       <input
         id={inputId}
         type="file"
-        accept="audio/*"
+        accept={accept}
         required
         onChange={handleChange}
         className="sr-only"
@@ -64,6 +64,7 @@ export function FileAudio({ multiple, onFile, label, rounded, className }) {
 
 FileAudio.defaultProps = {
   label: "Put your audio file here",
+  accept: "audio/*"
 };
 
 FileAudio.propTypes = {
@@ -72,4 +73,5 @@ FileAudio.propTypes = {
   label: PropTypes.string,
   rounded: PropTypes.bool,
   className: PropTypes.string,
+  accept: PropTypes.string
 };

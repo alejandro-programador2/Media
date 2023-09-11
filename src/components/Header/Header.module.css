@@ -1,3 +1,7 @@
+:root {
+    --header: 4rem;
+}
+
 header {
     position: sticky;
     top: 0;
@@ -10,7 +14,8 @@ header {
     display: grid;
     grid-template-columns: fit-content(10ch) 2fr 1fr;
     gap: clamp(1rem, 6vmax, 1.3rem);
-    padding-block: clamp(0.5rem, 5%, 0.9rem);
+    height: var(--header);
+    /* padding-block: clamp(0.5rem, 5%, 0.9rem); */
 }
 
 .header__logo {

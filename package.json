@@ -14,10 +14,12 @@
     "@dnd-kit/modifiers": "^6.0.1",
     "@dnd-kit/sortable": "^7.0.2",
     "@ffmpeg/ffmpeg": "^0.11.6",
+    "@shopify/react-web-worker": "^5.0.13",
     "framer-motion": "^10.12.18",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.0"
+    "react-router-dom": "^6.14.0",
+    "wavesurfer.js": "^7.1.5"
   },
   "devDependencies": {
     "@types/react": "^18.0.37",

@@ -7,8 +7,8 @@ import {
   useCallback,
 } from "react";
 import PropTypes from "prop-types";
-import Regions from "https://unpkg.com/wavesurfer.js@7.0.0-beta.11/dist/plugins/regions.js";
-import Hover from "https://unpkg.com/wavesurfer.js@beta/dist/plugins/hover.js";
+import Regions from 'wavesurfer.js/plugins/regions'
+import Hover from 'wavesurfer.js/plugins/hover'
 
 import { useWaveSurfer } from "../../hooks/useWaveSurfer";
 import converterTime from "../../helper/converterTime";
