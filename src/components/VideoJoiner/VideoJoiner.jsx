@@ -7,6 +7,8 @@ import {
   useLayoutEffect,
   useMemo,
   useContext,
+  Children,
+  cloneElement,
 } from "react";
 import PropTypes from "prop-types";
 import {
@@ -993,7 +995,7 @@ function Drag({ children, ...props }) {
     };
 
     const gapBetweenDrags = calculateXAxisGap(id);
-    
+
     newCoordinates.axisX += gapBetweenDrags;
     setCoordinates(newCoordinates);
   };
@@ -1063,7 +1065,12 @@ const Item = ({ children, id, parentSize, duration, axisX }) => {
         data-element="drag"
         {...listeners}
       >
-        {children}
+        {Children.map(children, (child) =>
+          cloneElement(child, {
+            ...child.props,
+            horizontalPosition: styles.left,
+          })
+        )}
         <span
           data-resize-side="left"
           className={`${css["drag-item__buttons"]} ${css["drag-item__buttons--left"]}`}
@@ -1077,10 +1084,13 @@ const Item = ({ children, id, parentSize, duration, axisX }) => {
   );
 };
 
-function Frames({ frames }) {
+function Frames({ frames, horizontalPosition }) {
   return (
     <div className={css.frame}>
-      <ul className="flex items-center h-full">
+      <ul
+        className="flex items-center h-full"
+        style={{ transform: `translateX(-${horizontalPosition})` }}
+      >
         {frames.map(({ id, url }) => (
           <li key={id} className="w-20 shrink-0 grow-0 ">
             <img src={url} alt="" className="w-full h-auto block" />
@@ -1132,6 +1142,7 @@ Tracks.propTypes = {
 
 Frames.propTypes = {
   frames: PropTypes.array,
+  horizontalPosition: PropTypes.string,
 };
 
 TimeLine.propTypes = {
